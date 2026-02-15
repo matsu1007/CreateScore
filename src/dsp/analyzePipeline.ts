@@ -30,9 +30,11 @@ export const analyzePipeline = ({
   const vad = runVad(samples, sampleRate, {
     frameLenMs: params.frameLenMs,
     hopMs: params.hopMs,
-    silenceConfirmMs: 100,
+    silenceConfirmMs: 140,
     voiceConfirmMs: 50,
-    thresholdScale: 1.5
+    enterThresholdScale: 1.5,
+    exitThresholdScale: 1.2,
+    preRollMs: 30
   });
 
   onProgress?.("pitch", 0.45);
