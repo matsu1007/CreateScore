@@ -5,7 +5,7 @@ import { createId } from "../utils/id";
 export const DEFAULT_GRID: GridSetting = {
   bpm: 120,
   timeSig: { num: 4, den: 4 },
-  division: "1/8"
+  division: "1/16"
 };
 
 export const initialState: ProjectState = {

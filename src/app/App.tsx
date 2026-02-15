@@ -246,7 +246,7 @@ export const App = (): JSX.Element => {
 
     const bpm = Math.max(40, Math.min(240, state.grid.bpm));
     const intervalMs = 60_000 / bpm;
-    for (let beat = 0; beat < 4; beat += 1) {
+    for (let beat = 0; beat < 8; beat += 1) {
       const timerId = window.setTimeout(() => {
         triggerMetronomeClick(ctx as AudioContext, beat === 0);
       }, beat * intervalMs);
@@ -258,7 +258,7 @@ export const App = (): JSX.Element => {
         previewMetronomeCtxRef.current = null;
       }
       previewMetronomeTimersRef.current = [];
-    }, intervalMs * 4 + 120);
+    }, intervalMs * 8 + 120);
     previewMetronomeTimersRef.current.push(closeTimerId);
   };
 

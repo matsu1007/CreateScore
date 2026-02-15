@@ -47,6 +47,9 @@
 - 録音した音声を再生できる
 - 録音を破棄（Clear）できる
 - 録音時間の上限を設ける（MVP推奨: 60秒）
+- 録音メトロノームのON/OFFを切り替えできる
+- 録音前にメトロノーム音を確認できる（8拍プレビュー）
+- 録音中は設定BPMに追従したメトロノームを再生できる（4/4先頭拍アクセント）
 
 ### 1.4.2 解析
 - 録音音声から、単旋律のピッチ（f0）を推定できる
@@ -79,7 +82,6 @@
 - ノート再生を停止できる
 - ノート再生の一時停止/再開ができる
 - ノート再生時、ピアノロール上で現在再生位置（プレイヘッド）を表示できる
-- （任意）メトロノーム再生
 
 ### 1.4.6 エクスポート
 - 編集結果をMIDI（SMF）としてダウンロードできる
@@ -102,7 +104,7 @@
 
 ## 1.7 受入基準（MVP / 測定可能）
 - 基本動作:
-  - 録音→解析→ピアノロール表示→編集→MIDI出力が一連で成立する
+  - 録音前メトロノーム確認→録音→解析→ピアノロール表示→編集→MIDI出力が一連で成立する
   - ノート再生中にプレイヘッドが進み、一時停止/再開/停止で整合した挙動を示す
   - ExportしたMIDIを一般的DAWで読み込める（SMFとして破損していない）
 - 出力の最小品質:
@@ -135,9 +137,11 @@
 - Stop: 録音停止（録音済み状態へ）
 - Play Original: 録音音声再生
 - Clear: 録音データ破棄（状態初期化）
+- 録音メトロノーム: ON/OFF切替
+- メトロノーム確認: 録音前に8拍プレビュー再生
 
 ### 出力（表示）
-- 録音状態（Recording / Recorded / Empty）
+- 状態表示（Empty / Recording / Recorded / Analyzing / Ready / Error）
 - 録音時間（mm:ss）
 - （任意）波形の簡易表示
 
@@ -222,7 +226,8 @@
 - マイク権限拒否: エラー表示し録音不可
 - 録音データなしでAnalyze: 無効化または警告
 - 解析失敗: Error状態に遷移し、再試行導線を提示
-- 解析に時間がかかる: UIは応答し続ける（Workerで実行）
+- 解析に時間がかかる: UIは応答し続ける（基本はWorkerで実行）
+- Workerの起動/実行に失敗した場合はメインスレッド解析へフォールバックする
 
 ---
 
@@ -389,6 +394,7 @@ export type PlaybackUiState = {
 - `Recording` --(Stop)--> `Recorded`（audio確定）
 - `Recorded` --(Analyze)--> `Analyzing`
 - `Ready` --(Analyze)--> `Analyzing`（再解析）
+- `Error` --(Analyze)--> `Analyzing`（audioが保持されている場合の再試行）
 - `Analyzing` --(Success)--> `Ready`
 - `Analyzing` --(Fail)--> `Error`
 - `Ready` --(Clear)--> `Empty`
@@ -419,13 +425,15 @@ export type PlaybackUiState = {
 - 一時停止中は `playheadTick` を保持し、再開時はその位置から進行を再開する
 - 停止時は `playheadTick=null` に戻す
 
-## 3.5 並列実行/スレッド設計（推奨）【転送最適化を明記】
-- 解析（VAD/YIN/ノート化/量子化）は **Web Worker** で実行し、UIスレッドをブロックしない
-- audio転送はコピーを避けるため、可能なら `ArrayBuffer` を **Transferable** として所有権移譲する
-- メッセージ:
+## 3.5 並列実行/スレッド設計（実装準拠）
+- 解析（VAD/YIN/ノート化/量子化）は基本的に **Web Worker** で実行し、UIスレッドをブロックしない
+- Workerの生成・実行・メッセージ送信で失敗した場合は、同一パイプラインをメインスレッドで実行してフォールバックする
+- メッセージI/F（判別用 `type` を含む）:
   - `AnalyzeRequest { audioBuffer: ArrayBuffer, sampleRate, grid, params }`
-  - `AnalyzeResult { frames, notesRaw, notesQ }`
-  - `AnalyzeError { code, message }`
+  - `AnalyzeProgress { type: "progress", stage: "vad"|"pitch"|"segment"|"quantize", progress }`
+  - `AnalyzeResult { type: "result", frames, notesRaw, notesQ }`
+  - `AnalyzeError { type: "error", code, message }`
+- `audioBuffer` は `Float32Array` のバッファをコピーして送信する（送信失敗時はフォールバック）
 
 ## 3.6 初期パラメータ（MVP推奨）
 - sampleRate: 16000
@@ -434,7 +442,8 @@ export type PlaybackUiState = {
 - Pitch: confMin=0.3
 - Smooth: median window=7
 - Segment: K=8 frames（80ms）、M=3 frames（30ms）、minNoteSec=60ms
-- Grid: BPM=120、division=1/8、4/4固定
+- Grid: BPM=120、division=1/16、4/4固定
+- Record metronome: BPM連動、4/4先頭拍アクセント、プレビューは8拍
 - MIDI: PPQ=480、channel=0、velocity=90
 
 ---

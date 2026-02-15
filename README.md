@@ -5,6 +5,7 @@
 ## 機能
 
 - ブラウザ録音 (`Record / Stop / Play Original / Clear`)
+- 録音メトロノーム（ON/OFF、録音前8拍プレビュー）
 - 16kHz mono へ変換して Worker で解析
 - VAD + ピッチ推定 + 平滑化 + ノート区間化 + 量子化
 - Division切替（`1/8` / `1/16` / `1/32`）
