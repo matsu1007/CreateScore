@@ -62,12 +62,14 @@ export const encodeSmfType0 = (notes: NoteQ[], grid: GridSetting): Uint8Array =>
 
   events.push({ deltaTime: 0, meta: true, type: "endOfTrack" });
 
-  return writeMidi({
-    header: {
-      format: 0,
-      numTracks: 1,
-      ticksPerBeat: PPQ
-    },
-    tracks: [events as never[]]
-  });
+  return new Uint8Array(
+    writeMidi({
+      header: {
+        format: 0,
+        numTracks: 1,
+        ticksPerBeat: PPQ
+      },
+      tracks: [events as never[]]
+    })
+  );
 };

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { ProjectState } from "./types";
 import {
   canAnalyze,
   canExport,
@@ -87,7 +88,7 @@ describe("store", () => {
   });
 
   it("keeps up to five undo steps", () => {
-    let state = {
+    let state: ProjectState = {
       ...initialState,
       status: "Ready" as const,
       notesQ: [{ id: "a", midi: 60, startTick: 0, durationTick: 2, velocity: 90 }],

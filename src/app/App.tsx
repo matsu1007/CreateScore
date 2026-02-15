@@ -444,7 +444,9 @@ export const App = (): JSX.Element => {
       return;
     }
     const bytes = encodeSmfType0(state.notesQ, state.grid);
-    const blob = new Blob([bytes], { type: "audio/midi" });
+    const midiBuffer = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(midiBuffer).set(bytes);
+    const blob = new Blob([midiBuffer], { type: "audio/midi" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
