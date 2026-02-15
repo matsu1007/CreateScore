@@ -51,6 +51,7 @@ export const analyzePipeline = ({
   const notesRaw = segmentNotes(frames, {
     stableFrames: 8,
     jitterToleranceFrames: 3,
+    deadbandCent: 35,
     minNoteSec: 0.06,
     silenceEndMs: 50,
     hopMs: params.hopMs

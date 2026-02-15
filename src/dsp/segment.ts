@@ -10,6 +10,7 @@ type SegmentOptions = {
   minNoteSec?: number;
   silenceEndMs?: number;
   hopMs?: number;
+  deadbandCent?: number;
 };
 
 type NoteBuilder = {
@@ -85,6 +86,7 @@ export const segmentNotes = (frames: PitchFrame[], options: SegmentOptions = {})
   const jitterToleranceFrames = options.jitterToleranceFrames ?? 3;
   const minNoteSec = options.minNoteSec ?? 0.06;
   const silenceFrames = Math.max(1, Math.round((options.silenceEndMs ?? 50) / (options.hopMs ?? 10)));
+  const deadbandSemitone = Math.max(0, (options.deadbandCent ?? 35) / 100);
   const hopSec = frames.length > 1 ? Math.max(1e-6, frames[1].tSec - frames[0].tSec) : 0.01;
   const frameLenSec = 0.03;
 
@@ -121,10 +123,8 @@ export const segmentNotes = (frames: PitchFrame[], options: SegmentOptions = {})
       continue;
     }
 
-    const currentMidi = Math.round(median(builder.midiValues));
-    const incomingMidi = Math.round(midiFloat);
-
-    if (Math.abs(incomingMidi - currentMidi) <= 0.5) {
+    const currentMidi = median(builder.midiValues);
+    if (Math.abs(midiFloat - currentMidi) <= deadbandSemitone) {
       builder.endIndex = i;
       builder.midiValues.push(midiFloat);
       builder.confValues.push(frame.conf);
