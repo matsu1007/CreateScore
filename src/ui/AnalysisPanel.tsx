@@ -24,7 +24,7 @@ export const AnalysisPanel = ({
   return (
     <section className="panel">
       <h2>解析・設定</h2>
-      <div className="row">
+      <div className="row row-controls analysis-controls">
         <label htmlFor="bpm">BPM</label>
         <input
           id="bpm"
@@ -50,7 +50,7 @@ export const AnalysisPanel = ({
           Analyze
         </button>
       </div>
-      <div className="row" style={{ marginTop: 8 }}>
+      <div className="row row-status">
         <span className="badge">状態: {status}</span>
         {status === "Analyzing" ? <span>進捗: {Math.round(analyzeProgress * 100)}%</span> : null}
       </div>

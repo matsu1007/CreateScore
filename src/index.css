@@ -28,6 +28,12 @@ select {
   gap: 12px;
 }
 
+.app h1 {
+  margin: 0;
+  font-size: clamp(1.2rem, 2.8vw, 1.8rem);
+  line-height: 1.2;
+}
+
 .panel {
   background: #ffffffd9;
   border: 1px solid #bfd4df;
@@ -45,6 +51,11 @@ select {
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.row-toggle,
+.row-status {
+  margin-top: 8px;
 }
 
 button {
@@ -144,9 +155,83 @@ button:disabled {
 @media (max-width: 640px) {
   .app {
     padding: 10px;
+    gap: 10px;
   }
 
   .panel {
     padding: 10px;
+    border-radius: 8px;
+  }
+
+  .panel h2 {
+    font-size: 0.96rem;
+  }
+
+  .tabs button {
+    flex: 1;
+    min-height: 40px;
+  }
+
+  .row-controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .row-controls button {
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 6px;
+  }
+
+  .analysis-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: center;
+  }
+
+  .analysis-controls label {
+    font-size: 0.9rem;
+  }
+
+  .analysis-controls input,
+  .analysis-controls select {
+    width: 100% !important;
+    min-width: 0;
+  }
+
+  .row-status {
+    font-size: 0.9rem;
+    gap: 6px;
+  }
+
+  .note-toolbar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .note-toolbar button {
+    width: 100%;
+    min-height: 38px;
+    padding: 7px 6px;
+    font-size: 0.84rem;
+  }
+
+  .canvas-wrap-piano {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .row-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .note-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

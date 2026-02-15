@@ -22,7 +22,7 @@ export const ExportPanel = ({
   return (
     <section className="panel">
       <h2>出力</h2>
-      <div className="row">
+      <div className="row row-controls">
         <button onClick={onPlay} disabled={!canPlay}>
           ノート再生
         </button>

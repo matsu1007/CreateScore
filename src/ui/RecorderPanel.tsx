@@ -37,7 +37,7 @@ export const RecorderPanel = ({
   return (
     <section className="panel">
       <h2>録音</h2>
-      <div className="row">
+      <div className="row row-controls">
         <button onClick={onRecord} disabled={status === "Recording" || status === "Analyzing"}>
           Record
         </button>
@@ -54,7 +54,7 @@ export const RecorderPanel = ({
           メトロノーム確認
         </button>
       </div>
-      <div className="row" style={{ marginTop: 8 }}>
+      <div className="row row-toggle">
         <label>
           <input
             type="checkbox"
@@ -64,7 +64,7 @@ export const RecorderPanel = ({
           録音メトロノーム
         </label>
       </div>
-      <div className="row" style={{ marginTop: 8 }}>
+      <div className="row row-status">
         <span className="badge">状態: {status}</span>
         <span>録音時間: {formatSec(durationSec)}</span>
       </div>
