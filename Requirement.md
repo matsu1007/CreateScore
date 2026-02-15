@@ -1,8 +1,8 @@
-# Requirement.md — 鼻歌→楽譜（MVP）仕様書（3階層）【改訂版 v1.1】
+# Requirement.md — 鼻歌→楽譜（MVP）仕様書（3階層）【改訂版 v1.2】
 
 作成日: 2026-02-15  
 改訂日: 2026-02-15  
-対象: Webアプリ（React / Browser-only / サーバ無し）  
+対象: Webアプリ（React / Browser-only / サーバ無し）および Desktopアプリ（Electron）  
 前提: **一定テンポ前提（後で編集）**・単旋律（鼻歌/ハミング）・4/4固定（MVP）
 
 ---
@@ -19,6 +19,9 @@
   - division=1/8 → 2  
   - division=1/16 → 4
   - division=1/32 → 8
+- **Electron Main**: ウィンドウ生成・OS連携を担当するメインプロセス
+- **Electron Renderer**: 既存React UIを描画するプロセス
+- **Preload**: Main/Renderer間の安全なブリッジ層（`contextBridge`）
 
 ---
 
@@ -112,6 +115,13 @@
   - A4（440Hz）等のテスト入力で主要音高が **±1半音以内**に入る（合成サイン波/簡易テスト）
 - 性能:
   - 30秒音声で解析が **5秒以内**（目標値、測定環境をREADMEで固定）
+
+## 1.8 Desktop版要件（追加）
+- 既存Web版と同等の主要機能（録音・解析・編集・再生・MIDI出力）をDesktopアプリで提供する
+- サーバレス・ローカル完結処理の原則を維持する
+- Desktop版でも解析はWorker利用を基本とし、失敗時はメインスレッドフォールバックを維持する
+- RendererにNode権限を直接与えない（`contextIsolation=true`, `nodeIntegration=false`）
+- Desktop版の初期対応OSはWindows（将来macOS対応を追加）
 
 ---
 
@@ -448,6 +458,67 @@ export type PlaybackUiState = {
 
 ---
 
+# 4. Desktopアプリ版仕様（Electron）
+
+## 4.1 目的と提供形態
+- Web版と同一のUI/解析ロジックをDesktopアプリとして配布し、ブラウザ依存を減らす
+- 配布形式はインストーラ付き実行ファイル（Windows向け）を初期ターゲットとする
+
+## 4.2 スコープ
+- 対象:
+  - 既存Web機能のDesktop移植
+  - マイク録音、解析、Piano Roll編集、再生、MIDI出力
+  - 自動更新なしの単体配布（MVP）
+- 非対象:
+  - クラウド同期
+  - ログイン/アカウント機能
+  - DAWプラグイン化
+
+## 4.3 アーキテクチャ
+- `Main Process`:
+  - `BrowserWindow` の作成
+  - 権限ハンドリング（マイク）
+  - 将来のネイティブ保存ダイアログ/ファイルI/O窓口
+- `Renderer Process`:
+  - 既存 `Vite + React` アプリをそのまま利用
+  - 録音/解析/編集/再生のUI処理
+- `Preload`:
+  - 必要最小限のAPIのみ `contextBridge` で公開
+  - 初版は最小（将来 `saveFile` API 等を拡張）
+
+## 4.4 セキュリティ要件
+- `nodeIntegration: false`
+- `contextIsolation: true`
+- `sandbox: true` を基本方針とし、必要時のみ例外を明記する
+- リモートコンテンツ読込禁止（ローカル生成物のみ読み込む）
+- `preload` 経由で公開するAPIはホワイトリスト方式で制御する
+
+## 4.5 権限・デバイス要件
+- 録音機能利用時にマイク権限が必要
+- 権限拒否時はWeb版同様に `Error` 状態へ遷移し、再試行導線を表示する
+- OS設定でマイク無効の場合のエラー文言をDesktop向けに明示する
+
+## 4.6 画面・機能整合
+- UI/状態遷移はWeb版仕様（章1〜3）と同一
+- 解析パラメータ・MIDI出力仕様（Type0, PPQ=480）も同一
+- ファイル名既定値 `humming.mid` を維持
+
+## 4.7 ビルド・配布仕様
+- ビルド構成:
+  - Web公開向けビルドとDesktop向けビルドを分離する
+  - Desktop向け `base` は相対パス（`./`）を使用する
+- 配布:
+  - `electron-builder` 等でWindows実行ファイルを生成
+  - GitHub Releases等で成果物を配布する
+
+## 4.8 Desktop版受入基準
+- 起動後、録音→解析→編集→再生→MIDI出力が一連で成立する
+- マイク権限拒否時にエラー表示され、再試行可能である
+- 30秒音声の解析時間がWeb版目標（5秒以内）から大きく悪化しない
+- 生成MIDIが主要DAWで読込可能である
+
+---
+
 ## 付録A. フォルダ構成（参考）
 ```
 src/
@@ -477,4 +548,12 @@ src/
   utils/
     math.ts
     id.ts
+```
+
+## 付録B. Desktop拡張時の想定追加構成（参考）
+```
+electron/
+  main.ts
+  preload.ts
+  builder.config.(yml|json)
 ```
