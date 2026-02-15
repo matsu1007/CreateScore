@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { GridSetting, ProjectStatus } from "../app/types";
 
 type AnalysisPanelProps = {
@@ -21,6 +22,21 @@ export const AnalysisPanel = ({
   onDivisionChange,
   onTapTempo
 }: AnalysisPanelProps): JSX.Element => {
+  const [bpmInput, setBpmInput] = useState<string>(String(grid.bpm));
+
+  useEffect(() => {
+    setBpmInput(String(grid.bpm));
+  }, [grid.bpm]);
+
+  const commitBpmInput = (): void => {
+    const parsed = Number(bpmInput);
+    if (!Number.isFinite(parsed)) {
+      setBpmInput(String(grid.bpm));
+      return;
+    }
+    onBpmChange(parsed);
+  };
+
   return (
     <section className="panel">
       <h2>解析・設定</h2>
@@ -31,8 +47,16 @@ export const AnalysisPanel = ({
           type="number"
           min={40}
           max={240}
-          value={grid.bpm}
-          onChange={(event) => onBpmChange(Number(event.target.value))}
+          step={1}
+          inputMode="numeric"
+          value={bpmInput}
+          onChange={(event) => setBpmInput(event.target.value)}
+          onBlur={commitBpmInput}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              commitBpmInput();
+            }
+          }}
           style={{ width: 88 }}
         />
         <label htmlFor="division">Division</label>
