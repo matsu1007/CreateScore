@@ -30,7 +30,6 @@
 - Tap Tempo（直近6タップ）
 
 ### 表示
-- Pitch View（無声ギャップあり）
 - Piano Roll View（音名ラベル付き）
 - 横スクロール対応
 

@@ -10,7 +10,6 @@ import type { PlaybackController } from "../midi/playback";
 import { AnalysisPanel } from "../ui/AnalysisPanel";
 import { ExportPanel } from "../ui/ExportPanel";
 import { PianoRollView } from "../ui/PianoRollView";
-import { PitchView } from "../ui/PitchView";
 import { RecorderPanel } from "../ui/RecorderPanel";
 import {
   canAnalyze,
@@ -33,7 +32,6 @@ export const App = (): JSX.Element => {
   const [state, dispatch] = useReducer(projectReducer, initialState);
   const [durationSec, setDurationSec] = useState(0);
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
-  const [tab, setTab] = useState<"pitch" | "piano">("piano");
   const [analyzeProgress, setAnalyzeProgress] = useState(0);
   const [tapTimes, setTapTimes] = useState<number[]>([]);
   const [splitTick, setSplitTick] = useState(0);
@@ -516,99 +514,78 @@ export const App = (): JSX.Element => {
       />
 
       <section className="panel">
-        <h2>表示・編集</h2>
-        <div className="tabs">
-          <button
-            className={tab === "pitch" ? "tab-active" : ""}
-            onClick={() => setTab("pitch")}
-          >
-            Pitch
+        <h2>Piano Roll 編集</h2>
+        <div className="note-toolbar">
+          <button onClick={() => setMultiSelectMode((v) => !v)}>
+            モバイル複数選択: {multiSelectMode ? "ON" : "OFF"}
+          </button>
+          <button onClick={handleUndoEdit} disabled={!canUndo(state)}>
+            Undo
           </button>
           <button
-            className={tab === "piano" ? "tab-active" : ""}
-            onClick={() => setTab("piano")}
+            onClick={() => handleTransposeAllSemitone("down")}
+            disabled={state.notesQ.length === 0}
           >
-            Piano Roll
+            -1semi
+          </button>
+          <button
+            onClick={() => handleTransposeAllSemitone("up")}
+            disabled={state.notesQ.length === 0}
+          >
+            +1semi
+          </button>
+          <button
+            onClick={() => handleTransposeAllOctave("down")}
+            disabled={state.notesQ.length === 0}
+          >
+            -1oct
+          </button>
+          <button
+            onClick={() => handleTransposeAllOctave("up")}
+            disabled={state.notesQ.length === 0}
+          >
+            +1oct
+          </button>
+          <button
+            onClick={() => {
+              dispatch({ type: "beginEdit" });
+              dispatch({ type: "splitSelection", splitTick });
+            }}
+            disabled={state.selection.noteIds.length !== 1}
+          >
+            Split
+          </button>
+          <button
+            onClick={() => {
+              dispatch({ type: "beginEdit" });
+              dispatch({ type: "joinSelection" });
+            }}
+            disabled={state.selection.noteIds.length < 2}
+          >
+            Join
+          </button>
+          <button
+            onClick={() => {
+              dispatch({ type: "beginEdit" });
+              dispatch({ type: "deleteSelection" });
+            }}
+            disabled={state.selection.noteIds.length === 0}
+          >
+            Delete
           </button>
         </div>
-
-        {tab === "pitch" ? (
-          <PitchView frames={state.frames ?? []} />
-        ) : (
-          <>
-            <div className="note-toolbar">
-              <button onClick={() => setMultiSelectMode((v) => !v)}>
-                モバイル複数選択: {multiSelectMode ? "ON" : "OFF"}
-              </button>
-              <button onClick={handleUndoEdit} disabled={!canUndo(state)}>
-                Undo
-              </button>
-              <button
-                onClick={() => handleTransposeAllSemitone("down")}
-                disabled={state.notesQ.length === 0}
-              >
-                -1semi
-              </button>
-              <button
-                onClick={() => handleTransposeAllSemitone("up")}
-                disabled={state.notesQ.length === 0}
-              >
-                +1semi
-              </button>
-              <button
-                onClick={() => handleTransposeAllOctave("down")}
-                disabled={state.notesQ.length === 0}
-              >
-                -1oct
-              </button>
-              <button
-                onClick={() => handleTransposeAllOctave("up")}
-                disabled={state.notesQ.length === 0}
-              >
-                +1oct
-              </button>
-              <button
-                onClick={() => {
-                  dispatch({ type: "beginEdit" });
-                  dispatch({ type: "splitSelection", splitTick });
-                }}
-                disabled={state.selection.noteIds.length !== 1}
-              >
-                Split
-              </button>
-              <button
-                onClick={() => {
-                  dispatch({ type: "beginEdit" });
-                  dispatch({ type: "joinSelection" });
-                }}
-                disabled={state.selection.noteIds.length < 2}
-              >
-                Join
-              </button>
-              <button
-                onClick={() => {
-                  dispatch({ type: "beginEdit" });
-                  dispatch({ type: "deleteSelection" });
-                }}
-                disabled={state.selection.noteIds.length === 0}
-              >
-                Delete
-              </button>
-            </div>
-            <PianoRollView
-              notes={state.notesQ}
-              selection={state.selection.noteIds}
-              playheadTick={playheadTick}
-              multiSelectMode={multiSelectMode}
-              onSelect={handleSelect}
-              onSetSplitTick={setSplitTick}
-              onEditStart={() => dispatch({ type: "beginEdit" })}
-              onMoveSelection={(deltaTick, deltaMidi) =>
-                dispatch({ type: "moveSelection", deltaTick, deltaMidi })
-              }
-            />
-          </>
-        )}
+        <PianoRollView
+          notes={state.notesQ}
+          selection={state.selection.noteIds}
+          playheadTick={playheadTick}
+          multiSelectMode={multiSelectMode}
+          onSelect={handleSelect}
+          onSetSplitTick={setSplitTick}
+          onEditStart={() => dispatch({ type: "beginEdit" })}
+          onMoveSelection={(deltaTick, deltaMidi) =>
+            dispatch({ type: "moveSelection", deltaTick, deltaMidi })
+          }
+        />
       </section>
 
       <ExportPanel

@@ -49,6 +49,7 @@ export const PianoRollView = ({
   onMoveSelection
 }: PianoRollViewProps): JSX.Element => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const labelCanvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [pan, setPan] = useState<PanState | null>(null);
@@ -108,58 +109,32 @@ export const PianoRollView = ({
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    const labelCanvas = labelCanvasRef.current;
     const wrap = wrapRef.current;
-    if (!canvas) {
+    if (!canvas || !labelCanvas) {
       return;
     }
     const minScrollableWidth = (wrap?.clientWidth ?? 0) + 600;
-    const width = Math.max(1400, minScrollableWidth, bounds.maxTick * TICK_PX + LABEL_W);
+    const width = Math.max(1400, minScrollableWidth, bounds.maxTick * TICK_PX);
     const height = (bounds.maxMidi - bounds.minMidi + 1) * ROW_H;
     canvas.width = width;
     canvas.height = height;
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
+    labelCanvas.width = LABEL_W;
+    labelCanvas.height = height;
+    labelCanvas.style.width = `${LABEL_W}px`;
+    labelCanvas.style.height = `${height}px`;
 
     const ctx = canvas.getContext("2d");
-    if (!ctx) {
+    const labelCtx = labelCanvas.getContext("2d");
+    if (!ctx || !labelCtx) {
       return;
     }
 
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = "#fbfdff";
     ctx.fillRect(0, 0, width, height);
-
-    // Left label lane for note names.
-    ctx.fillStyle = "#f0f4f8";
-    ctx.fillRect(0, 0, LABEL_W, height);
-
-    for (let midi = bounds.minMidi; midi <= bounds.maxMidi; midi += 1) {
-      const y = (bounds.maxMidi - midi) * ROW_H;
-      const isBlack = [1, 3, 6, 8, 10].includes(midi % 12);
-      if (isBlack) {
-        ctx.fillStyle = "#e3ebf2";
-        ctx.fillRect(0, y, LABEL_W, ROW_H);
-      }
-      ctx.fillStyle = midi % 12 === 0 ? "#102332" : "#385265";
-      ctx.font = "11px sans-serif";
-      ctx.textBaseline = "middle";
-      ctx.fillText(midiToNoteName(midi), 6, y + ROW_H / 2);
-    }
-
-    ctx.strokeStyle = "#b5c6d1";
-    ctx.beginPath();
-    ctx.moveTo(LABEL_W, 0);
-    ctx.lineTo(LABEL_W, height);
-    ctx.stroke();
-
-    for (let tick = 0; tick <= bounds.maxTick; tick += 1) {
-      ctx.strokeStyle = tick % 4 === 0 ? "#b5c6d1" : "#e2ebf0";
-      ctx.beginPath();
-      const x = LABEL_W + tick * TICK_PX;
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-      ctx.stroke();
-    }
 
     for (let midi = bounds.minMidi; midi <= bounds.maxMidi; midi += 1) {
       const y = (bounds.maxMidi - midi) * ROW_H;
@@ -170,9 +145,39 @@ export const PianoRollView = ({
       ctx.stroke();
     }
 
+    for (let tick = 0; tick <= bounds.maxTick + 1; tick += 1) {
+      ctx.strokeStyle = tick % 4 === 0 ? "#b5c6d1" : "#e2ebf0";
+      ctx.beginPath();
+      const x = tick * TICK_PX;
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+    }
+
+    for (let midi = bounds.minMidi; midi <= bounds.maxMidi; midi += 1) {
+      const y = (bounds.maxMidi - midi) * ROW_H;
+      const isBlack = [1, 3, 6, 8, 10].includes(midi % 12);
+      labelCtx.fillStyle = isBlack ? "#e3ebf2" : "#f0f4f8";
+      labelCtx.fillRect(0, y, LABEL_W, ROW_H);
+      labelCtx.fillStyle = midi % 12 === 0 ? "#102332" : "#385265";
+      labelCtx.font = "11px sans-serif";
+      labelCtx.textBaseline = "middle";
+      labelCtx.fillText(midiToNoteName(midi), 6, y + ROW_H / 2);
+      labelCtx.strokeStyle = midi % 12 === 0 ? "#bcccd6" : "#edf3f7";
+      labelCtx.beginPath();
+      labelCtx.moveTo(0, y);
+      labelCtx.lineTo(LABEL_W, y);
+      labelCtx.stroke();
+    }
+    labelCtx.strokeStyle = "#b5c6d1";
+    labelCtx.beginPath();
+    labelCtx.moveTo(LABEL_W - 0.5, 0);
+    labelCtx.lineTo(LABEL_W - 0.5, height);
+    labelCtx.stroke();
+
     const selected = new Set(selection);
     for (const note of notes) {
-      const x = LABEL_W + note.startTick * TICK_PX;
+      const x = note.startTick * TICK_PX;
       const y = (bounds.maxMidi - note.midi) * ROW_H + 1;
       const w = Math.max(4, note.durationTick * TICK_PX - 2);
       const h = ROW_H - 2;
@@ -183,7 +188,7 @@ export const PianoRollView = ({
     }
 
     if (playheadTick !== null) {
-      const x = LABEL_W + playheadTick * TICK_PX;
+      const x = playheadTick * TICK_PX;
       ctx.strokeStyle = "#e14b4b";
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -204,7 +209,7 @@ export const PianoRollView = ({
     if (!wrap) {
       return;
     }
-    const x = LABEL_W + playheadTick * TICK_PX;
+    const x = playheadTick * TICK_PX;
     const left = wrap.scrollLeft;
     const right = left + wrap.clientWidth;
     const margin = 120;
@@ -218,7 +223,7 @@ export const PianoRollView = ({
 
   const pickNote = (x: number, y: number): NoteQ | null => {
     for (const note of [...notes].reverse()) {
-      const nx = LABEL_W + note.startTick * TICK_PX;
+      const nx = note.startTick * TICK_PX;
       const ny = (bounds.maxMidi - note.midi) * ROW_H;
       const nw = note.durationTick * TICK_PX;
       const nh = ROW_H;
@@ -233,7 +238,7 @@ export const PianoRollView = ({
     const x = event.nativeEvent.offsetX;
     const y = event.nativeEvent.offsetY;
     const note = pickNote(x, y);
-    const tick = Math.max(0, Math.round((x - LABEL_W) / TICK_PX));
+    const tick = Math.max(0, Math.round(x / TICK_PX));
     onSetSplitTick(tick);
 
     if (!note) {
@@ -300,19 +305,24 @@ export const PianoRollView = ({
   };
 
   return (
-    <div ref={wrapRef} className="canvas-wrap canvas-wrap-piano">
-      <canvas
-        ref={canvasRef}
-        style={{
-          display: "block",
-          touchAction: "pan-x",
-          cursor: pan ? "grabbing" : "default"
-        }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-      />
+    <div className="piano-roll-shell">
+      <div className="piano-roll-label-lane">
+        <canvas ref={labelCanvasRef} style={{ display: "block" }} />
+      </div>
+      <div ref={wrapRef} className="canvas-wrap canvas-wrap-piano">
+        <canvas
+          ref={canvasRef}
+          style={{
+            display: "block",
+            touchAction: "pan-x",
+            cursor: pan ? "grabbing" : "default"
+          }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        />
+      </div>
     </div>
   );
 };

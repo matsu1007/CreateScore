@@ -73,17 +73,6 @@ button:disabled {
   cursor: not-allowed;
 }
 
-.tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.tab-active {
-  background: #c7ebff;
-  border-color: #4e85a8;
-}
-
 .canvas-wrap {
   width: 100%;
   overflow-x: scroll;
@@ -126,12 +115,33 @@ button:disabled {
 .canvas-wrap-piano {
   width: 100%;
   max-width: 960px;
-  margin: 0 auto;
   max-height: none;
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x;
+}
+
+.piano-roll-shell {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 0;
+}
+
+.piano-roll-label-lane {
+  border: 1px solid #bdd2de;
+  border-right: 0;
+  border-radius: 8px 0 0 8px;
+  background: #f0f4f8;
+  overflow: hidden;
+}
+
+.piano-roll-shell .canvas-wrap-piano {
+  border-left: 0;
+  border-radius: 0 8px 8px 0;
 }
 
 .note-toolbar {
