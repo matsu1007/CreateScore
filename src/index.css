@@ -1,0 +1,152 @@
+:root {
+  font-family: "Noto Sans JP", "Hiragino Kaku Gothic ProN", sans-serif;
+  color: #132230;
+  background: radial-gradient(circle at top right, #d6edf9, #f4f8fb 60%);
+  line-height: 1.45;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.panel {
+  background: #ffffffd9;
+  border: 1px solid #bfd4df;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.panel h2 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+button {
+  border: 1px solid #7897ac;
+  background: #f5fbff;
+  color: #0f2330;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.tab-active {
+  background: #c7ebff;
+  border-color: #4e85a8;
+}
+
+.canvas-wrap {
+  width: 100%;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  border: 1px solid #bdd2de;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.canvas-wrap {
+  scrollbar-width: thin;
+  scrollbar-color: #7e9caf #e6eef3;
+}
+
+.canvas-wrap::-webkit-scrollbar {
+  height: 12px;
+}
+
+.canvas-wrap::-webkit-scrollbar-track {
+  background: #e6eef3;
+  border-radius: 999px;
+}
+
+.canvas-wrap::-webkit-scrollbar-thumb {
+  background: #7e9caf;
+  border-radius: 999px;
+  border: 2px solid #e6eef3;
+}
+
+.canvas-wrap::-webkit-scrollbar-thumb:hover {
+  background: #5f7f95;
+}
+
+.canvas-wrap-pitch {
+  max-height: 320px;
+}
+
+.canvas-wrap-piano {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+}
+
+.note-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.error {
+  color: #a51111;
+  font-weight: 600;
+}
+
+.badge {
+  border-radius: 999px;
+  background: #e3f2fb;
+  padding: 2px 8px;
+  font-size: 0.86rem;
+}
+
+@media (max-width: 640px) {
+  .app {
+    padding: 10px;
+  }
+
+  .panel {
+    padding: 10px;
+  }
+}
