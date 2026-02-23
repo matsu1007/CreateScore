@@ -6,9 +6,11 @@ type AnalysisPanelProps = {
   grid: GridSetting;
   analyzeProgress: number;
   canAnalyze: boolean;
+  deadbandCent: number;
   onAnalyze: () => void;
   onBpmChange: (bpm: number) => void;
   onDivisionChange: (division: GridSetting["division"]) => void;
+  onDeadbandCentChange: (cent: number) => void;
   onTapTempo: () => void;
 };
 
@@ -17,16 +19,23 @@ export const AnalysisPanel = ({
   grid,
   analyzeProgress,
   canAnalyze,
+  deadbandCent,
   onAnalyze,
   onBpmChange,
   onDivisionChange,
+  onDeadbandCentChange,
   onTapTempo
 }: AnalysisPanelProps): JSX.Element => {
   const [bpmInput, setBpmInput] = useState<string>(String(grid.bpm));
+  const [deadbandInput, setDeadbandInput] = useState<string>(String(deadbandCent));
 
   useEffect(() => {
     setBpmInput(String(grid.bpm));
   }, [grid.bpm]);
+
+  useEffect(() => {
+    setDeadbandInput(String(deadbandCent));
+  }, [deadbandCent]);
 
   const commitBpmInput = (): void => {
     const parsed = Number(bpmInput);
@@ -35,6 +44,15 @@ export const AnalysisPanel = ({
       return;
     }
     onBpmChange(parsed);
+  };
+
+  const commitDeadbandInput = (): void => {
+    const parsed = Number(deadbandInput);
+    if (!Number.isFinite(parsed)) {
+      setDeadbandInput(String(deadbandCent));
+      return;
+    }
+    onDeadbandCentChange(parsed);
   };
 
   return (
@@ -70,6 +88,24 @@ export const AnalysisPanel = ({
           <option value="1/32">1/32</option>
         </select>
         <button onClick={onTapTempo}>Tap Tempo</button>
+        <label htmlFor="deadband-cent">Deadband(cents)</label>
+        <input
+          id="deadband-cent"
+          type="number"
+          min={0}
+          max={100}
+          step={1}
+          inputMode="numeric"
+          value={deadbandInput}
+          onChange={(event) => setDeadbandInput(event.target.value)}
+          onBlur={commitDeadbandInput}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              commitDeadbandInput();
+            }
+          }}
+          style={{ width: 96 }}
+        />
         <button onClick={onAnalyze} disabled={!canAnalyze}>
           Analyze
         </button>

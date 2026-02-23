@@ -7,6 +7,7 @@ import { estimateTapTempo } from "../dsp/tapTempo";
 import { encodeSmfType0 } from "../midi/smf";
 import { playNotes } from "../midi/playback";
 import type { PlaybackController } from "../midi/playback";
+import { clamp } from "../utils/math";
 import { AnalysisPanel } from "../ui/AnalysisPanel";
 import { ExportPanel } from "../ui/ExportPanel";
 import { PianoRollView } from "../ui/PianoRollView";
@@ -25,7 +26,8 @@ const ANALYZE_PARAMS = {
   hopMs: 10,
   confMin: 0.3,
   fmin: 80,
-  fmax: 1000
+  fmax: 1000,
+  deadbandCent: 35
 };
 
 export const App = (): JSX.Element => {
@@ -40,6 +42,7 @@ export const App = (): JSX.Element => {
   const [isPlaybackActive, setIsPlaybackActive] = useState(false);
   const [isPlaybackPaused, setIsPlaybackPaused] = useState(false);
   const [recordMetronomeEnabled, setRecordMetronomeEnabled] = useState(true);
+  const [deadbandCent, setDeadbandCent] = useState<number>(ANALYZE_PARAMS.deadbandCent);
 
   const recorderRef = useRef<RecorderController | null>(null);
   const playbackRef = useRef<PlaybackController | null>(null);
@@ -264,6 +267,10 @@ export const App = (): JSX.Element => {
     if (!state.audio) {
       return;
     }
+    const analyzeParams = {
+      ...ANALYZE_PARAMS,
+      deadbandCent
+    };
     dispatch({ type: "analyzeStart" });
     setAnalyzeProgress(0);
     const runAnalyzeFallback = (): void => {
@@ -273,7 +280,7 @@ export const App = (): JSX.Element => {
             samples: samplesCopy,
             sampleRate: state.audio?.sampleRate ?? 16000,
             grid: state.grid,
-            params: ANALYZE_PARAMS,
+            params: analyzeParams,
             onProgress: (_stage, progress) => {
               setAnalyzeProgress(progress);
             }
@@ -353,7 +360,7 @@ export const App = (): JSX.Element => {
       audioBuffer: samplesCopy.buffer.slice(0),
       sampleRate: state.audio.sampleRate,
       grid: state.grid,
-      params: ANALYZE_PARAMS
+      params: analyzeParams
     };
     try {
       worker.postMessage(request);
@@ -510,6 +517,8 @@ export const App = (): JSX.Element => {
         onAnalyze={runAnalyze}
         onBpmChange={(bpm) => dispatch({ type: "updateGrid", grid: { bpm } })}
         onDivisionChange={(division) => dispatch({ type: "updateGrid", grid: { division } })}
+        deadbandCent={deadbandCent}
+        onDeadbandCentChange={(value) => setDeadbandCent(clamp(Math.round(value), 0, 100))}
         onTapTempo={handleTapTempo}
       />
 

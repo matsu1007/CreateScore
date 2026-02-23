@@ -59,6 +59,7 @@ export type AnalyzeParams = {
   confMin: number;
   fmin: number;
   fmax: number;
+  deadbandCent: number;
 };
 
 export type AnalyzeRequest = {
