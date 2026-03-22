@@ -5,11 +5,11 @@ import { analyzePipeline } from "../dsp/analyzePipeline";
 
 const ctx: DedicatedWorkerGlobalScope = self as never;
 
-ctx.onmessage = (event: MessageEvent<AnalyzeRequest>) => {
+ctx.onmessage = async (event: MessageEvent<AnalyzeRequest>) => {
   try {
     const { audioBuffer, sampleRate, grid, params } = event.data;
     const samples = new Float32Array(audioBuffer);
-    const { frames, notesRaw, notesQ } = analyzePipeline({
+    const { frames, notesRaw, notesQ, pitchBackendUsed } = await analyzePipeline({
       samples,
       sampleRate,
       grid,
@@ -27,7 +27,8 @@ ctx.onmessage = (event: MessageEvent<AnalyzeRequest>) => {
       type: "result",
       frames,
       notesRaw,
-      notesQ
+      notesQ,
+      pitchBackendUsed
     };
     ctx.postMessage(result);
   } catch (error) {

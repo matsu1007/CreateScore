@@ -466,6 +466,18 @@ CREPE出力 `activation[t, k] (k=0..359)` から f0Hz と confidence を得る�
 - Segment: K=8 frames（80ms）、M=3 frames（30ms）
 - Grid: BPM=120、division=1/8、4/4固定
 
+## 3.7 精度優先構成（CREPE）実装進捗チェック
+- [x] 1. [INFRA] onnxruntime-web導入とCREPE基盤ディレクトリ作成
+- [x] 2. [TYPE] AnalyzeParams拡張（backend/model/normalize/outputKind/batch）
+- [x] 3. [WORKER] pitch.worker の Message Protocol 実装（INIT/ANALYZE）
+- [x] 4. [DSP] CREPE前処理実装（16k/1024/160/center-pad/normalize）
+- [x] 5. [DSP] ONNX入出力アダプタ実装（shape/name差異吸収）
+- [x] 6. [DSP] CREPE後処理実装（activation/logit→f0Hz/conf）
+- [x] 7. [RUNTIME] ORTランタイム実装（webgpu優先・wasmフォールバック・warmup・batch）
+- [x] 8. [PIPELINE] analyzePipeline統合（CREPE/YIN切替）
+- [x] 9. [UI] 解析設定UI追加（Backend/Model/confMin/batch）+ 実backend表示
+- [x] 10. [QA/DOC] テスト強化とREADME更新（精度優先構成）
+
 ---
 
 ## 付録A. フォルダ構成（参考）

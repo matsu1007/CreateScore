@@ -11,6 +11,7 @@ import { clamp } from "../utils/math";
 import { AnalysisPanel } from "../ui/AnalysisPanel";
 import { ExportPanel } from "../ui/ExportPanel";
 import { PianoRollView } from "../ui/PianoRollView";
+import { PitchCurveView } from "../ui/PitchCurveView";
 import { RecorderPanel } from "../ui/RecorderPanel";
 import {
   canAnalyze,
@@ -19,15 +20,20 @@ import {
   initialState,
   projectReducer
 } from "./store";
-import type { AnalyzeMessage, AnalyzeRequest } from "./types";
+import type { AnalyzeMessage, AnalyzeParams, AnalyzeRequest } from "./types";
 
-const ANALYZE_PARAMS = {
+const ANALYZE_PARAMS: AnalyzeParams = {
   frameLenMs: 30,
   hopMs: 10,
   confMin: 0.3,
   fmin: 80,
   fmax: 1000,
-  deadbandCent: 35
+  deadbandCent: 35,
+  pitchBackend: "yin",
+  modelVariant: "tiny",
+  normalizeMode: "per_frame",
+  outputKind: "prob",
+  batchFrames: 256
 };
 
 export const App = (): JSX.Element => {
@@ -43,6 +49,17 @@ export const App = (): JSX.Element => {
   const [isPlaybackPaused, setIsPlaybackPaused] = useState(false);
   const [recordMetronomeEnabled, setRecordMetronomeEnabled] = useState(true);
   const [deadbandCent, setDeadbandCent] = useState<number>(ANALYZE_PARAMS.deadbandCent);
+  const [pitchBackend, setPitchBackend] = useState<AnalyzeParams["pitchBackend"]>(
+    ANALYZE_PARAMS.pitchBackend
+  );
+  const [modelVariant, setModelVariant] = useState<AnalyzeParams["modelVariant"]>(
+    ANALYZE_PARAMS.modelVariant
+  );
+  const [confMin, setConfMin] = useState<number>(ANALYZE_PARAMS.confMin);
+  const [batchFrames, setBatchFrames] = useState<number>(ANALYZE_PARAMS.batchFrames);
+  const [effectivePitchBackend, setEffectivePitchBackend] = useState<AnalyzeParams["pitchBackend"] | null>(
+    null
+  );
 
   const recorderRef = useRef<RecorderController | null>(null);
   const playbackRef = useRef<PlaybackController | null>(null);
@@ -228,6 +245,7 @@ export const App = (): JSX.Element => {
     setDurationSec(0);
     setAnalyzeProgress(0);
     setTapTimes([]);
+    setEffectivePitchBackend(null);
     dispatch({ type: "clear" });
   };
 
@@ -269,38 +287,46 @@ export const App = (): JSX.Element => {
     }
     const analyzeParams = {
       ...ANALYZE_PARAMS,
-      deadbandCent
+      deadbandCent,
+      pitchBackend,
+      modelVariant,
+      confMin,
+      batchFrames
     };
     dispatch({ type: "analyzeStart" });
     setAnalyzeProgress(0);
+    setEffectivePitchBackend(null);
     const runAnalyzeFallback = (): void => {
       window.setTimeout(() => {
-        try {
-          const { frames, notesRaw, notesQ } = analyzePipeline({
-            samples: samplesCopy,
-            sampleRate: state.audio?.sampleRate ?? 16000,
-            grid: state.grid,
-            params: analyzeParams,
-            onProgress: (_stage, progress) => {
-              setAnalyzeProgress(progress);
-            }
-          });
-          dispatch({
-            type: "analyzeSuccess",
-            payload: {
-              frames,
-              notesRaw,
-              notesQ
-            }
-          });
-          setAnalyzeProgress(1);
-        } catch (error) {
-          dispatch({
-            type: "analyzeFail",
-            code: "ANALYZE_FAILED",
-            message: error instanceof Error ? error.message : "解析中にエラーが発生しました"
-          });
-        }
+        void (async () => {
+          try {
+            const { frames, notesRaw, notesQ, pitchBackendUsed } = await analyzePipeline({
+              samples: samplesCopy,
+              sampleRate: state.audio?.sampleRate ?? 16000,
+              grid: state.grid,
+              params: analyzeParams,
+              onProgress: (_stage, progress) => {
+                setAnalyzeProgress(progress);
+              }
+            });
+            dispatch({
+              type: "analyzeSuccess",
+              payload: {
+                frames,
+                notesRaw,
+                notesQ
+              }
+            });
+            setEffectivePitchBackend(pitchBackendUsed);
+            setAnalyzeProgress(1);
+          } catch (error) {
+            dispatch({
+              type: "analyzeFail",
+              code: "ANALYZE_FAILED",
+              message: error instanceof Error ? error.message : "解析中にエラーが発生しました"
+            });
+          }
+        })();
       }, 0);
     };
 
@@ -340,6 +366,7 @@ export const App = (): JSX.Element => {
             notesQ: message.notesQ
           }
         });
+        setEffectivePitchBackend(message.pitchBackendUsed);
         setAnalyzeProgress(1);
         worker?.terminate();
         return;
@@ -519,8 +546,24 @@ export const App = (): JSX.Element => {
         onDivisionChange={(division) => dispatch({ type: "updateGrid", grid: { division } })}
         deadbandCent={deadbandCent}
         onDeadbandCentChange={(value) => setDeadbandCent(clamp(Math.round(value), 0, 100))}
+        pitchBackend={pitchBackend}
+        onPitchBackendChange={setPitchBackend}
+        modelVariant={modelVariant}
+        onModelVariantChange={setModelVariant}
+        confMin={confMin}
+        onConfMinChange={(value) => setConfMin(clamp(value, 0, 1))}
+        batchFrames={batchFrames}
+        onBatchFramesChange={(value) => setBatchFrames(clamp(Math.round(value), 1, 1024))}
+        effectivePitchBackend={effectivePitchBackend}
         onTapTempo={handleTapTempo}
       />
+
+      {state.frames && state.frames.length > 0 && (
+        <section className="panel">
+          <h2>ピッチカーブ</h2>
+          <PitchCurveView frames={state.frames} />
+        </section>
+      )}
 
       <section className="panel">
         <h2>Piano Roll 編集</h2>

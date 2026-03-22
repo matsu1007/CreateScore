@@ -18,7 +18,7 @@
 ### 解析
 - 16kHz mono 変換
 - VAD
-- ピッチ推定
+- ピッチ推定（YIN / CREPE）
 - 平滑化
 - ノート区間化
 - 量子化
@@ -28,6 +28,10 @@
 - BPM (`40-240`)
 - Division (`1/8` / `1/16` / `1/32`, デフォルト `1/16`)
 - Deadband(cents) (`0-100`, デフォルト `35`)
+- Backend (`YIN` / `CREPE(WebGPU)` / `CREPE(WASM)`)
+- Model (`tiny` / `full`)
+- confMin (`0.0-1.0`)
+- batch (`1-1024`)
 - Tap Tempo（直近6タップ）
 
 ### 表示
@@ -58,6 +62,16 @@ npm run dev
 ```
 
 ブラウザで表示されるローカルURLを開いて使用します。
+
+## CREPEモデル配置
+CREPEバックエンドを使う場合、ONNXモデルを `public/model/` に配置してください。
+
+- `public/model/crepe_tiny.onnx`（推奨・既定）
+- `public/model/crepe_full.onnx`（任意）
+
+補足:
+- モデルが無い、またはWebGPU/WASMが使えない場合は `YIN` へフォールバックします。
+- 実際に使用されたBackendは解析パネルの「実行Backend」に表示されます。
 
 ## Desktop版（Electron）
 開発起動:
@@ -97,6 +111,10 @@ npm test
 - `src/app/store.ts`
 - `src/dsp/tapTempo.ts`
 - `src/dsp/segment.ts`
+- `src/dsp/analyzePipeline.ts`（backend切替/フォールバック）
+- `src/dsp/crepe/preprocess.ts`
+- `src/dsp/crepe/adapter.ts`
+- `src/dsp/crepe/decode.ts`
 
 ## 仕様メモ
 - Project status: `Empty / Recording / Recorded / Analyzing / Ready / Error`
@@ -135,6 +153,11 @@ npm install --include=optional
   それでも失敗する場合は以下のいずれかで回避できます。
   1. Windows の「開発者モード」を有効化する
   2. ターミナルを管理者権限で起動して `npm run desktop:dist` を実行する
+
+- CREPEを選択してもYINになる場合:
+  1. `public/models/crepe_tiny.onnx` が配置されているか確認
+  2. ブラウザのWebGPU対応状況を確認（未対応ならWASM経由）
+  3. それでも失敗する場合は実行環境制約によりYINへフォールバックします
 
 ## ディレクトリ構成
 - `src/app`: 状態管理・型・アプリ本体

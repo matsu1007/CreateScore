@@ -1,5 +1,4 @@
 const http = require("node:http");
-const path = require("node:path");
 const fs = require("node:fs");
 const { spawn } = require("node:child_process");
 
@@ -9,9 +8,8 @@ const DEV_URL = `http://${HOST}:${PORT}`;
 const IS_WIN = process.platform === "win32";
 
 const npmCmd = IS_WIN ? "npm.cmd" : "npm";
-const electronBin = IS_WIN
-  ? path.join(process.cwd(), "node_modules", ".bin", "electron.cmd")
-  : path.join(process.cwd(), "node_modules", ".bin", "electron");
+// electron パッケージを plain Node.js から require するとバイナリへのパスが返る
+const electronBin = require("electron");
 
 const waitForVite = async (timeoutMs = 60000) => {
   const startedAt = Date.now();
@@ -83,7 +81,7 @@ process.on("exit", shutdown);
       ...process.env,
       VITE_DEV_SERVER_URL: DEV_URL
     },
-    shell: IS_WIN
+    shell: false
   });
 
   electronProc.on("error", (error) => {

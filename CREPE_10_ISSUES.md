@@ -1,6 +1,6 @@
 # CREPE精度優先構成 実装Issue（10チケット）
 
-## 1. [INFRA] onnxruntime-web導入とCREPE基盤ディレクトリ作成
+## [x] 1. [INFRA] onnxruntime-web導入とCREPE基盤ディレクトリ作成
 - 目的: CREPE実装の土台を作る
 - 作業:
   - `onnxruntime-web` 追加
@@ -11,7 +11,7 @@
 - 完了条件:
   - `npm install` 後に `npx tsc -b` が通る
 
-## 2. [TYPE] AnalyzeParams拡張（backend/model/normalize/outputKind/batch）
+## [x] 2. [TYPE] AnalyzeParams拡張（backend/model/normalize/outputKind/batch）
 - 目的: 精度優先構成の設定を型で固定
 - 作業:
   - `AnalyzeParams` に `pitchBackend`, `modelVariant`, `normalizeMode`, `outputKind`, `batchFrames` を追加
@@ -21,7 +21,7 @@
 - 完了条件:
   - 型エラーなしでビルド可能
 
-## 3. [WORKER] pitch.worker の Message Protocol 実装（INIT/ANALYZE）
+## [x] 3. [WORKER] pitch.worker の Message Protocol 実装（INIT/ANALYZE）
 - 目的: CREPE推論用Workerの通信契約を実装
 - 作業:
   - `INIT/ANALYZE` 受信
@@ -33,7 +33,7 @@
 - 完了条件:
   - Worker起動し、ダミーで `READY -> RESULT` が返る
 
-## 4. [DSP] CREPE前処理実装（16k/1024/160/center-pad/normalize）
+## [x] 4. [DSP] CREPE前処理実装（16k/1024/160/center-pad/normalize）
 - 目的: モデル入力を仕様通りに整形
 - 作業:
   - mono16k前提のフレーム化
@@ -45,7 +45,7 @@
 - 完了条件:
   - frame数・timestamp・正規化テスト通過
 
-## 5. [DSP] ONNX入出力アダプタ実装（shape/name差異吸収）
+## [x] 5. [DSP] ONNX入出力アダプタ実装（shape/name差異吸収）
 - 目的: モデル差異に依存しない推論I/O
 - 作業:
   - `inputNames/outputNames` 自動取得
@@ -56,7 +56,7 @@
 - 完了条件:
   - shape差異ケースのテスト通過
 
-## 6. [DSP] CREPE後処理実装（activation/logit→f0Hz/conf）
+## [x] 6. [DSP] CREPE後処理実装（activation/logit→f0Hz/conf）
 - 目的: 360bin出力を `PitchFrame` へ変換
 - 作業:
   - `binToHz` 実装
@@ -68,7 +68,7 @@
 - 完了条件:
   - 主要変換テストが通る
 
-## 7. [RUNTIME] ORTランタイム実装（webgpu優先・wasmフォールバック・warmup・batch）
+## [x] 7. [RUNTIME] ORTランタイム実装（webgpu優先・wasmフォールバック・warmup・batch）
 - 目的: 実運用できる推論実行器を作る
 - 作業:
   - `webgpu -> wasm` 優先順実装
@@ -80,7 +80,7 @@
 - 完了条件:
   - backend選択が仕様順に動作し、推論が完走
 
-## 8. [PIPELINE] analyzePipeline統合（CREPE/YIN切替）
+## [x] 8. [PIPELINE] analyzePipeline統合（CREPE/YIN切替）
 - 目的: 既存パイプラインに精度優先backendを統合
 - 作業:
   - ピッチ推定器をbackend選択式に変更
@@ -91,7 +91,7 @@
 - 完了条件:
   - backend変更してもノート生成まで完走
 
-## 9. [UI] 解析設定UI追加（Backend/Model/confMin/batch）+ 実backend表示
+## [x] 9. [UI] 解析設定UI追加（Backend/Model/confMin/batch）+ 実backend表示
 - 目的: ユーザが精度優先構成を選べるようにする
 - 作業:
   - Analysis Panelに設定項目追加
@@ -102,7 +102,7 @@
 - 完了条件:
   - UI操作が `AnalyzeParams` に反映される
 
-## 10. [QA/DOC] テスト強化とREADME更新（精度優先構成）
+## [x] 10. [QA/DOC] テスト強化とREADME更新（精度優先構成）
 - 目的: 回帰防止と運用手順の明文化
 - 作業:
   - fallback順序、変換ロジック、Worker通信テスト追加
