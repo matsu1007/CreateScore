@@ -63,15 +63,63 @@ npm run dev
 
 ブラウザで表示されるローカルURLを開いて使用します。
 
-## CREPEモデル配置
+## CREPEバックエンド
+
+### 概要
+CREPE（Convolutional REpresentation for Pitch Estimation）はDNNによるピッチ推定モデルです。  
+YINより高精度で、特に声楽・ハミングに強い特性を持ちます。
+
+| Backend | 説明 |
+|---|---|
+| `CREPE(WebGPU)` | GPUで推論。WebGPUに対応したブラウザ/GPUが必要。最速。 |
+| `CREPE(WASM)` | CPU（WASM）で推論。環境を問わず動作。WebGPU非対応時は自動でこちらに落ちる。 |
+| `YIN` | モデル不要の従来手法。CREPEセッション初期化失敗時のフォールバック先。 |
+
+### モデルの用意
 CREPEバックエンドを使う場合、ONNXモデルを `public/model/` に配置してください。
 
-- `public/model/crepe_tiny.onnx`（推奨・既定）
-- `public/model/crepe_full.onnx`（任意）
+| ファイル | サイズ目安 | 精度 | 推奨用途 |
+|---|---|---|---|
+| `public/model/crepe_tiny.onnx` | 約 2 MB | 標準 | 通常使用 |
+| `public/model/crepe_full.onnx` | 約 130 MB | 高精度 | 精度優先 |
+
+**モデルのエクスポート手順:**
+
+Python環境（3.10+）で以下を実行します。
+
+```bash
+pip install torch torchcrepe onnx onnxruntime onnxscript
+```
+
+```bash
+# tiny モデル（約 2MB）
+python export_crepe_torch.py tiny
+
+# full モデル（約 130MB）
+python export_crepe_torch.py full
+```
+
+出力された `crepe_tiny.onnx` / `crepe_full.onnx` を `public/model/` に配置してください。
+
+### ランタイムファイルの配置
+`public/ort/` に onnxruntime-web の WASM ファイルを配置してください。
+
+```bash
+node -e "
+const src = 'node_modules/onnxruntime-web/dist';
+const dst = 'public/ort';
+const fs = require('fs');
+fs.mkdirSync(dst, { recursive: true });
+for (const f of fs.readdirSync(src).filter(f => /\.(wasm|mjs)$/.test(f)))
+  fs.copyFileSync(src+'/'+f, dst+'/'+f);
+console.log('done');
+"
+```
 
 補足:
 - モデルが無い、またはWebGPU/WASMが使えない場合は `YIN` へフォールバックします。
 - 実際に使用されたBackendは解析パネルの「実行Backend」に表示されます。
+- `public/ort/` と `public/model/` は `.gitignore` で除外済みです（容量が大きいため）。
 
 ## Desktop版（Electron）
 開発起動:
@@ -155,9 +203,10 @@ npm install --include=optional
   2. ターミナルを管理者権限で起動して `npm run desktop:dist` を実行する
 
 - CREPEを選択してもYINになる場合:
-  1. `public/models/crepe_tiny.onnx` が配置されているか確認
-  2. ブラウザのWebGPU対応状況を確認（未対応ならWASM経由）
-  3. それでも失敗する場合は実行環境制約によりYINへフォールバックします
+  1. `public/model/crepe_tiny.onnx` が配置されているか確認
+  2. `public/ort/` に `.wasm` / `.mjs` ファイルが配置されているか確認
+  3. ブラウザのWebGPU対応状況を確認（未対応ならWASM経由で動作）
+  4. それでも失敗する場合は実行環境制約によりYINへフォールバックします
 
 ## ディレクトリ構成
 - `src/app`: 状態管理・型・アプリ本体
