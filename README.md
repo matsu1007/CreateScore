@@ -18,7 +18,7 @@
 ### 解析
 - 16kHz mono 変換
 - VAD
-- ピッチ推定
+- ピッチ推定（YIN / CREPE）
 - 平滑化
 - ノート区間化
 - 量子化
@@ -27,6 +27,11 @@
 ### 設定
 - BPM (`40-240`)
 - Division (`1/8` / `1/16` / `1/32`, デフォルト `1/16`)
+- Deadband(cents) (`0-100`, デフォルト `35`)
+- Backend (`YIN` / `CREPE(WebGPU)` / `CREPE(WASM)`)
+- Model (`tiny` / `full`)
+- confMin (`0.0-1.0`)
+- batch (`1-1024`)
 - Tap Tempo（直近6タップ）
 
 ### 表示
@@ -58,6 +63,36 @@ npm run dev
 
 ブラウザで表示されるローカルURLを開いて使用します。
 
+## CREPEモデル配置
+CREPEバックエンドを使う場合、ONNXモデルを `public/model/` に配置してください。
+
+- `public/model/crepe_tiny.onnx`（推奨・既定）
+- `public/model/crepe_full.onnx`（任意）
+
+補足:
+- モデルが無い、またはWebGPU/WASMが使えない場合は `YIN` へフォールバックします。
+- 実際に使用されたBackendは解析パネルの「実行Backend」に表示されます。
+
+## Desktop版（Electron）
+開発起動:
+```bash
+npm run desktop:dev
+```
+
+Desktop向けビルド:
+```bash
+npm run build:desktop
+```
+
+配布用パッケージ作成:
+```bash
+npm run desktop:dist
+```
+
+備考:
+- `desktop:start` は既存ビルド済み `dist-desktop` を読み込んで起動します。
+- `desktop:dist` は `electron-builder` を実行して `release/` に成果物を出力します。
+
 ## 使い方
 1. `メトロノーム確認` でテンポを確認（必要なら `BPM` と `Division` を調整）。
 2. `Record` で録音開始、`Stop` で終了。
@@ -76,6 +111,10 @@ npm test
 - `src/app/store.ts`
 - `src/dsp/tapTempo.ts`
 - `src/dsp/segment.ts`
+- `src/dsp/analyzePipeline.ts`（backend切替/フォールバック）
+- `src/dsp/crepe/preprocess.ts`
+- `src/dsp/crepe/adapter.ts`
+- `src/dsp/crepe/decode.ts`
 
 ## 仕様メモ
 - Project status: `Empty / Recording / Recorded / Analyzing / Ready / Error`
@@ -101,10 +140,24 @@ npm test
 ## トラブルシュート
 - `@rollup/rollup-...` が見つからず `npm test` / `vite` が失敗する場合:
 ```bash
-rm -rf node_modules package-lock.json
-npm install
+npm install --include=optional
 ```
 `npm` の optional dependency 解決不整合で発生することがあります。
+
+- 上記で解決しない場合:
+  `node_modules` と `package-lock.json` を削除してから `npm install` を再実行してください。
+
+- `desktop:dist` で `Cannot create symbolic link` が出る場合:
+  Windows の権限不足で `winCodeSign` 展開に失敗しています。  
+  このリポジトリは `signAndEditExecutable: false` を設定済みなので、最新コードを pull した上で再実行してください。  
+  それでも失敗する場合は以下のいずれかで回避できます。
+  1. Windows の「開発者モード」を有効化する
+  2. ターミナルを管理者権限で起動して `npm run desktop:dist` を実行する
+
+- CREPEを選択してもYINになる場合:
+  1. `public/models/crepe_tiny.onnx` が配置されているか確認
+  2. ブラウザのWebGPU対応状況を確認（未対応ならWASM経由）
+  3. それでも失敗する場合は実行環境制約によりYINへフォールバックします
 
 ## ディレクトリ構成
 - `src/app`: 状態管理・型・アプリ本体

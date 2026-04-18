@@ -2,15 +2,21 @@
   "name": "create-score",
   "private": true,
   "version": "0.1.0",
+  "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:desktop": "tsc -b && vite build --mode desktop",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "desktop:dev": "node electron/dev.cjs",
+    "desktop:start": "electron electron/main.cjs",
+    "desktop:dist": "npm run build:desktop && electron-builder -c electron/builder.json"
   },
   "dependencies": {
     "midi-file": "^1.2.4",
+    "onnxruntime-web": "^1.24.2",
     "pitchy": "^4.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
@@ -22,9 +28,22 @@
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3",
     "jsdom": "^25.0.1",
     "typescript": "^5.7.2",
     "vite": "^5.4.11",
     "vitest": "^2.1.8"
-  }
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-darwin-arm64": "^4.57.1",
+    "@rollup/rollup-darwin-x64": "^4.57.1",
+    "@rollup/rollup-linux-x64-gnu": "^4.57.1",
+    "@rollup/rollup-linux-x64-musl": "^4.57.1",
+    "@rollup/rollup-win32-arm64-msvc": "^4.57.1",
+    "@rollup/rollup-win32-ia32-msvc": "^4.57.1",
+    "@rollup/rollup-win32-x64-msvc": "^4.57.1"
+  },
+  "description": "Humming-to-MIDI converter and editor",
+  "author": "matsu1007"
 }

@@ -33,6 +33,11 @@ export type NoteQ = {
   velocity: number;
 };
 
+export type PitchBackend = "crepe-webgpu" | "crepe-wasm" | "yin";
+export type ModelVariant = "tiny" | "full";
+export type NormalizeMode = "per_frame" | "per_batch";
+export type OutputKind = "prob" | "logit";
+
 export type ProjectStatus =
   | "Empty"
   | "Recording"
@@ -59,6 +64,12 @@ export type AnalyzeParams = {
   confMin: number;
   fmin: number;
   fmax: number;
+  deadbandCent: number;
+  pitchBackend: PitchBackend;
+  modelVariant: ModelVariant;
+  normalizeMode: NormalizeMode;
+  outputKind: OutputKind;
+  batchFrames: number;
 };
 
 export type AnalyzeRequest = {
@@ -79,6 +90,7 @@ export type AnalyzeResult = {
   frames: PitchFrame[];
   notesRaw: NoteRaw[];
   notesQ: NoteQ[];
+  pitchBackendUsed: PitchBackend;
 };
 
 export type AnalyzeError = {
@@ -88,3 +100,49 @@ export type AnalyzeError = {
 };
 
 export type AnalyzeMessage = AnalyzeProgress | AnalyzeResult | AnalyzeError;
+
+export type PitchWorkerInitRequest = {
+  type: "INIT";
+  modelUrl: string;
+  preferred: "webgpu" | "wasm";
+  normalizeMode: NormalizeMode;
+  outputKind: OutputKind;
+};
+
+export type PitchWorkerAnalyzeRequest = {
+  type: "ANALYZE";
+  audioBuffer: ArrayBuffer;
+  sampleRate: number;
+  batchFrames?: number;
+};
+
+export type PitchWorkerRequest = PitchWorkerInitRequest | PitchWorkerAnalyzeRequest;
+
+export type PitchWorkerReady = {
+  type: "READY";
+  backend: "webgpu" | "wasm";
+  modelInfo?: { inputShape?: number[]; outputShape?: number[] };
+};
+
+export type PitchWorkerProgress = {
+  type: "PROGRESS";
+  doneFrames: number;
+  totalFrames: number;
+};
+
+export type PitchWorkerResult = {
+  type: "RESULT";
+  frames: PitchFrame[];
+};
+
+export type PitchWorkerError = {
+  type: "ERROR";
+  code: string;
+  message: string;
+};
+
+export type PitchWorkerMessage =
+  | PitchWorkerReady
+  | PitchWorkerProgress
+  | PitchWorkerResult
+  | PitchWorkerError;

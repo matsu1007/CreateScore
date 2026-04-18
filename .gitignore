@@ -1,6 +1,16 @@
 node_modules
 coverage
 dist
+dist-desktop
+release
 .DS_Store
 *.log
 .npm-cache
+
+# onnxruntime-web の WASM ランタイム（npm package から取得）
+public/ort/
+
+# ONNX モデルファイル（export_crepe_torch.py で生成して配置）
+public/model/
+*.onnx
+*.onnx.data
