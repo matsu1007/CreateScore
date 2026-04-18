@@ -1,3 +1,4 @@
+import sys
 import os
 import torch
 import torchcrepe
@@ -7,12 +8,18 @@ import onnx
 import onnxruntime as ort_cpu
 import numpy as np
 
-TMP = "crepe_tiny_tmp.onnx"
-OUT = "crepe_tiny.onnx"
+# コマンドライン引数でモデル種別を指定 (デフォルト: tiny)
+CAPACITY = sys.argv[1] if len(sys.argv) > 1 else "tiny"
+assert CAPACITY in ("tiny", "small", "medium", "large", "full"), f"Unknown capacity: {CAPACITY}"
+
+TMP = f"crepe_{CAPACITY}_tmp.onnx"
+OUT = f"crepe_{CAPACITY}.onnx"
+
+print(f"Exporting CREPE '{CAPACITY}' model → {OUT}")
 
 # torchcrepe パッケージ同梱のウェイトを直接ロード
-model = Crepe('tiny')
-weight_path = os.path.join(os.path.dirname(torchcrepe.__file__), 'assets', 'tiny.pth')
+model = Crepe(CAPACITY)
+weight_path = os.path.join(os.path.dirname(torchcrepe.__file__), 'assets', f'{CAPACITY}.pth')
 model.load_state_dict(torch.load(weight_path, map_location='cpu', weights_only=True))
 model.eval()
 
