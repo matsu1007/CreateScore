@@ -55,7 +55,7 @@ export const App = (): JSX.Element => {
   const [isPreviewMetronomeActive, setIsPreviewMetronomeActive] = useState(false);
   const [deadbandCent, setDeadbandCent] = useState<number>(ANALYZE_PARAMS.deadbandCent);
   const [pitchBackend, setPitchBackend] = useState<AnalyzeParams["pitchBackend"]>(
-    ANALYZE_PARAMS.pitchBackend
+    () => (navigator.maxTouchPoints > 0 ? "yin" : ANALYZE_PARAMS.pitchBackend)
   );
   const [modelVariant, setModelVariant] = useState<AnalyzeParams["modelVariant"]>(
     ANALYZE_PARAMS.modelVariant

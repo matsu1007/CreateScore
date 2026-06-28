@@ -63,6 +63,11 @@ export const PianoRollView = ({
   const headerWrapRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [pan, setPan] = useState<PanState | null>(null);
+  const touchHandlers = useRef<{
+    start: (e: globalThis.TouchEvent) => void;
+    move: (e: globalThis.TouchEvent) => void;
+    end: () => void;
+  }>({ start: () => {}, move: () => {}, end: () => {} });
 
   useEffect(() => {
     const wrap = wrapRef.current;
@@ -380,6 +385,78 @@ export const PianoRollView = ({
     setPan(null);
   };
 
+  // Update touch handlers every render so they always close over current state/props
+  touchHandlers.current.start = (e: globalThis.TouchEvent): void => {
+    if (e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    const note = pickNote(x, y);
+    onSetSplitTick(Math.max(0, Math.round(x / TICK_PX)));
+    if (!note) {
+      onSelect(null, false);
+      const wrap = wrapRef.current;
+      if (wrap) {
+        setPan({ startClientX: touch.clientX, startScrollLeft: wrap.scrollLeft });
+      }
+      return;
+    }
+    onSelect(note.id, multiSelectMode);
+    setDrag({ startX: x, startY: y, appliedTick: 0, appliedMidi: 0, editStarted: false });
+  };
+
+  touchHandlers.current.move = (e: globalThis.TouchEvent): void => {
+    if (e.touches.length !== 1) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    if (pan) {
+      const wrap = wrapRef.current;
+      if (wrap) {
+        wrap.scrollLeft = pan.startScrollLeft - (touch.clientX - pan.startClientX);
+      }
+      return;
+    }
+    if (!drag) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    const targetTick = Math.round((x - drag.startX) / TICK_PX);
+    const targetMidi = Math.round((drag.startY - y) / ROW_H);
+    const deltaTick = targetTick - drag.appliedTick;
+    const deltaMidi = targetMidi - drag.appliedMidi;
+    if (deltaTick !== 0 || deltaMidi !== 0) {
+      if (!drag.editStarted) onEditStart();
+      onMoveSelection(deltaTick, deltaMidi);
+      setDrag({ ...drag, appliedTick: targetTick, appliedMidi: targetMidi, editStarted: true });
+    }
+  };
+
+  touchHandlers.current.end = (): void => {
+    setDrag(null);
+    setPan(null);
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const onStart = (e: globalThis.TouchEvent) => touchHandlers.current.start(e);
+    const onMove = (e: globalThis.TouchEvent) => touchHandlers.current.move(e);
+    const onEnd = () => touchHandlers.current.end();
+    canvas.addEventListener("touchstart", onStart, { passive: false });
+    canvas.addEventListener("touchmove", onMove, { passive: false });
+    canvas.addEventListener("touchend", onEnd, { passive: false });
+    return () => {
+      canvas.removeEventListener("touchstart", onStart);
+      canvas.removeEventListener("touchmove", onMove);
+      canvas.removeEventListener("touchend", onEnd);
+    };
+  }, []);
+
   return (
     <div className="piano-roll-shell">
       <div className="piano-roll-header-corner" />
@@ -394,7 +471,7 @@ export const PianoRollView = ({
           ref={canvasRef}
           style={{
             display: "block",
-            touchAction: "pan-x",
+            touchAction: "none",
             cursor: pan ? "grabbing" : "default"
           }}
           onMouseDown={handleMouseDown}
