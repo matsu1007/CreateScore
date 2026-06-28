@@ -21,6 +21,10 @@ vi.mock("./quantize", () => ({
   quantizeNotes: vi.fn()
 }));
 
+vi.mock("./chordRoot", () => ({
+  estimateChordRoots: vi.fn().mockReturnValue([])
+}));
+
 vi.mock("./vad", () => ({
   runVad: vi.fn()
 }));
@@ -73,6 +77,51 @@ beforeEach(() => {
   vi.mocked(smoothPitchFrames).mockImplementation((frames) => frames);
   vi.mocked(segmentNotes).mockReturnValue(notesRaw);
   vi.mocked(quantizeNotes).mockReturnValue(notesQ);
+});
+
+describe("analyzePipeline leading silence trimming", () => {
+  it("shifts notes so the first note starts at t=0", async () => {
+    const silentNotes: NoteRaw[] = [
+      { id: "raw-1", midi: 60, startSec: 2.0, endSec: 2.5, conf: 0.9 },
+      { id: "raw-2", midi: 62, startSec: 2.6, endSec: 3.0, conf: 0.9 }
+    ];
+    vi.mocked(segmentNotes).mockReturnValue(silentNotes);
+
+    let captured: NoteRaw[] = [];
+    vi.mocked(quantizeNotes).mockImplementation((notes) => {
+      captured = notes as NoteRaw[];
+      return notesQ;
+    });
+
+    await analyzePipeline({
+      samples: new Float32Array(1600),
+      sampleRate: 16000,
+      grid,
+      params: baseParams
+    });
+
+    expect(captured[0].startSec).toBeCloseTo(0);
+    expect(captured[1].startSec).toBeCloseTo(0.6);
+    expect(captured[1].endSec).toBeCloseTo(1.0);
+  });
+
+  it("does not shift when first note already starts at 0", async () => {
+    let captured: NoteRaw[] = [];
+    vi.mocked(quantizeNotes).mockImplementation((notes) => {
+      captured = notes as NoteRaw[];
+      return notesQ;
+    });
+
+    await analyzePipeline({
+      samples: new Float32Array(1600),
+      sampleRate: 16000,
+      grid,
+      params: baseParams
+    });
+
+    // notesRaw fixture has startSec: 0 — should be passed as-is
+    expect(captured[0].startSec).toBe(0);
+  });
 });
 
 describe("analyzePipeline backend selection", () => {

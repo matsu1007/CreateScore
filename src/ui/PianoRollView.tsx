@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent } from "react";
-import type { NoteQ } from "../app/types";
+import type { ChordRoot, GridSetting, NoteQ } from "../app/types";
+import { gridTicksPerQuarter } from "../dsp/quantize";
 
 type PianoRollViewProps = {
   notes: NoteQ[];
   selection: string[];
+  correctedNoteIds?: string[];
   playheadTick: number | null;
   multiSelectMode: boolean;
+  grid: GridSetting;
+  chordRoots: ChordRoot[];
   onSelect: (noteId: string | null, additive: boolean) => void;
   onSetSplitTick: (tick: number) => void;
   onEditStart: () => void;
@@ -31,6 +35,7 @@ const ROW_H = 16;
 const LABEL_W = 56;
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"] as const;
+const HEADER_H = 22;
 
 const midiToNoteName = (midi: number): string => {
   const pitchClass = ((midi % 12) + 12) % 12;
@@ -41,8 +46,11 @@ const midiToNoteName = (midi: number): string => {
 export const PianoRollView = ({
   notes,
   selection,
+  correctedNoteIds,
   playheadTick,
   multiSelectMode,
+  grid,
+  chordRoots,
   onSelect,
   onSetSplitTick,
   onEditStart,
@@ -50,7 +58,9 @@ export const PianoRollView = ({
 }: PianoRollViewProps): JSX.Element => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const labelCanvasRef = useRef<HTMLCanvasElement>(null);
+  const headerCanvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const headerWrapRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [pan, setPan] = useState<PanState | null>(null);
 
@@ -81,6 +91,22 @@ export const PianoRollView = ({
     wrap.addEventListener("wheel", onWheel, { passive: false });
     return () => {
       wrap.removeEventListener("wheel", onWheel);
+    };
+  }, []);
+
+  // Sync header scroll to main canvas scroll
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    const headerWrap = headerWrapRef.current;
+    if (!wrap || !headerWrap) {
+      return;
+    }
+    const onScroll = (): void => {
+      headerWrap.scrollLeft = wrap.scrollLeft;
+    };
+    wrap.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      wrap.removeEventListener("scroll", onScroll);
     };
   }, []);
 
@@ -176,14 +202,17 @@ export const PianoRollView = ({
     labelCtx.stroke();
 
     const selected = new Set(selection);
+    const corrected = new Set(correctedNoteIds ?? []);
     for (const note of notes) {
       const x = note.startTick * TICK_PX;
       const y = (bounds.maxMidi - note.midi) * ROW_H + 1;
       const w = Math.max(4, note.durationTick * TICK_PX - 2);
       const h = ROW_H - 2;
-      ctx.fillStyle = selected.has(note.id) ? "#ffcb62" : "#62b2de";
+      const isSelected = selected.has(note.id);
+      const isCorrected = !isSelected && corrected.has(note.id);
+      ctx.fillStyle = isSelected ? "#ffcb62" : isCorrected ? "#76d275" : "#62b2de";
       ctx.fillRect(x + 1, y, w, h);
-      ctx.strokeStyle = selected.has(note.id) ? "#8e5d00" : "#1d5174";
+      ctx.strokeStyle = isSelected ? "#8e5d00" : isCorrected ? "#2a7229" : "#1d5174";
       ctx.strokeRect(x + 1, y, w, h);
     }
 
@@ -199,7 +228,54 @@ export const PianoRollView = ({
       ctx.fillStyle = "#e14b4b";
       ctx.fillRect(Math.max(LABEL_W, x - 4), 0, 8, 8);
     }
-  }, [bounds.maxMidi, bounds.maxTick, bounds.minMidi, notes, playheadTick, selection]);
+  }, [bounds.maxMidi, bounds.maxTick, bounds.minMidi, correctedNoteIds, notes, playheadTick, selection]);
+
+  // Draw chord root header
+  useEffect(() => {
+    const canvas = headerCanvasRef.current;
+    const wrap = wrapRef.current;
+    if (!canvas) {
+      return;
+    }
+    const minScrollableWidth = (wrap?.clientWidth ?? 0) + 600;
+    const width = Math.max(1400, minScrollableWidth, bounds.maxTick * TICK_PX);
+    canvas.width = width;
+    canvas.height = HEADER_H;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${HEADER_H}px`;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return;
+    }
+
+    ctx.clearRect(0, 0, width, HEADER_H);
+    ctx.fillStyle = "#f0f5f8";
+    ctx.fillRect(0, 0, width, HEADER_H);
+
+    if (chordRoots.length === 0) {
+      return;
+    }
+
+    const ticksPerMeasure = gridTicksPerQuarter(grid.division) * 4;
+
+    for (const { startTick, rootPc } of chordRoots) {
+      const x = startTick * TICK_PX;
+      const w = ticksPerMeasure * TICK_PX;
+
+      ctx.fillStyle = "#ddeef7";
+      ctx.fillRect(x + 1, 2, w - 2, HEADER_H - 4);
+
+      ctx.strokeStyle = "#8bb8d0";
+      ctx.strokeRect(x + 1, 2, w - 2, HEADER_H - 4);
+
+      ctx.fillStyle = "#0f3d57";
+      ctx.font = "bold 12px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(NOTE_NAMES[rootPc], x + w / 2, HEADER_H / 2);
+    }
+  }, [bounds.maxTick, chordRoots, grid]);
 
   useEffect(() => {
     if (playheadTick === null || drag || pan) {
@@ -306,6 +382,10 @@ export const PianoRollView = ({
 
   return (
     <div className="piano-roll-shell">
+      <div className="piano-roll-header-corner" />
+      <div ref={headerWrapRef} className="piano-roll-header-wrap">
+        <canvas ref={headerCanvasRef} style={{ display: "block" }} />
+      </div>
       <div className="piano-roll-label-lane">
         <canvas ref={labelCanvasRef} style={{ display: "block" }} />
       </div>

@@ -1,10 +1,13 @@
 import type {
   AnalyzeParams,
   PitchBackend,
-  AnalyzeResult,
-  GridSetting
+  GridSetting,
+  NoteQ,
+  PitchFrame,
+  ChordRoot
 } from "../app/types";
 import { createCrepeRuntime } from "./crepe/runtime";
+import { estimateChordRoots } from "./chordRoot";
 import { estimatePitchFrames } from "./pitch";
 import { quantizeNotes } from "./quantize";
 import { segmentNotes } from "./segment";
@@ -31,13 +34,20 @@ const resolveModelUrl = (params: AnalyzeParams): string => {
 const toPreferred = (backend: AnalyzeParams["pitchBackend"]): "webgpu" | "wasm" =>
   backend === "crepe-webgpu" ? "webgpu" : "wasm";
 
+type PipelineResult = {
+  frames: PitchFrame[];
+  notesQ: NoteQ[];
+  chordRoots: ChordRoot[];
+  pitchBackendUsed: PitchBackend;
+};
+
 export const analyzePipeline = async ({
   samples,
   sampleRate,
   grid,
   params,
   onProgress
-}: AnalyzePipelineInput): Promise<Omit<AnalyzeResult, "type">> => {
+}: AnalyzePipelineInput): Promise<PipelineResult> => {
   onProgress?.("vad", 0.2);
   const vad = runVad(samples, sampleRate, {
     frameLenMs: params.frameLenMs,
@@ -95,25 +105,33 @@ export const analyzePipeline = async ({
     pitchBackendUsed = "yin";
   }
 
-  const frames = smoothPitchFrames(pitchFrames, 7);
+  const frames = smoothPitchFrames(pitchFrames, 11);
 
   onProgress?.("segment", 0.7);
   const notesRaw = segmentNotes(frames, {
     stableFrames: 8,
     jitterToleranceFrames: 3,
     deadbandCent: params.deadbandCent,
-    minNoteSec: 0.06,
+    minNoteSec: 0.10,
     silenceEndMs: 50,
     hopMs: params.hopMs
   });
 
+  // Trim leading silence: shift all notes so the first note starts at t=0
+  const silenceOffset = notesRaw.length > 0 ? notesRaw[0].startSec : 0;
+  const notesAligned =
+    silenceOffset > 0
+      ? notesRaw.map((n) => ({ ...n, startSec: n.startSec - silenceOffset, endSec: n.endSec - silenceOffset }))
+      : notesRaw;
+
   onProgress?.("quantize", 0.9);
-  const notesQ = quantizeNotes(notesRaw, grid);
+  const notesQ = quantizeNotes(notesAligned, grid);
+  const chordRoots = estimateChordRoots(notesQ, grid);
 
   return {
     frames,
-    notesRaw,
     notesQ,
+    chordRoots,
     pitchBackendUsed
   };
 };

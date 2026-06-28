@@ -5,6 +5,7 @@ type RecorderPanelProps = {
   durationSec: number;
   hasRecording: boolean;
   metronomeEnabled: boolean;
+  isPreviewMetronomeActive: boolean;
   onRecord: () => void;
   onStop: () => void;
   onPlayOriginal: () => void;
@@ -27,6 +28,7 @@ export const RecorderPanel = ({
   durationSec,
   hasRecording,
   metronomeEnabled,
+  isPreviewMetronomeActive,
   onRecord,
   onStop,
   onPlayOriginal,
@@ -51,7 +53,7 @@ export const RecorderPanel = ({
           Clear
         </button>
         <button onClick={onPreviewMetronome} disabled={status === "Recording"}>
-          メトロノーム確認
+          {isPreviewMetronomeActive ? "メトロノーム停止" : "メトロノーム確認"}
         </button>
       </div>
       <div className="row row-toggle">

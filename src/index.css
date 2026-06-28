@@ -108,10 +108,6 @@ button:disabled {
   background: #5f7f95;
 }
 
-.canvas-wrap-pitch {
-  max-height: 320px;
-}
-
 .canvas-wrap-piano {
   width: 100%;
   max-width: 960px;
@@ -128,20 +124,38 @@ button:disabled {
   margin: 0 auto;
   display: grid;
   grid-template-columns: 56px minmax(0, 1fr);
+  grid-template-rows: 22px auto;
   gap: 0;
+}
+
+.piano-roll-header-corner {
+  background: #f0f4f8;
+  border: 1px solid #bdd2de;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 8px 0 0 0;
+}
+
+.piano-roll-header-wrap {
+  overflow: hidden;
+  border-top: 1px solid #bdd2de;
+  border-right: 1px solid #bdd2de;
+  border-bottom: 0;
+  border-radius: 0 8px 0 0;
+  background: #f0f5f8;
 }
 
 .piano-roll-label-lane {
   border: 1px solid #bdd2de;
   border-right: 0;
-  border-radius: 8px 0 0 8px;
+  border-radius: 0 0 0 8px;
   background: #f0f4f8;
   overflow: hidden;
 }
 
 .piano-roll-shell .canvas-wrap-piano {
   border-left: 0;
-  border-radius: 0 8px 8px 0;
+  border-radius: 0 0 8px 0;
 }
 
 .note-toolbar {
@@ -161,4 +175,60 @@ button:disabled {
   background: #e3f2fb;
   padding: 2px 8px;
   font-size: 0.86rem;
+}
+
+.btn-cancel {
+  background: #f5e6e6;
+  color: #7a1111;
+  border-color: #d9aaaa;
+}
+
+.btn-cancel:hover:not(:disabled) {
+  background: #f0d0d0;
+}
+
+.llm-status {
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: #3a5265;
+}
+
+.llm-status--done {
+  color: #1a6b2e;
+  font-weight: 600;
+}
+
+.llm-status--error {
+  color: #a51111;
+  font-weight: 600;
+}
+
+.llm-error-block {
+  margin-top: 4px;
+}
+
+.llm-help {
+  margin-top: 6px;
+  font-size: 0.88rem;
+  color: #3a5265;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.llm-help-note {
+  font-size: 0.82rem;
+  color: #5a7a8a;
+}
+
+.llm-help-command {
+  display: block;
+  margin-top: 4px;
+  padding: 6px 10px;
+  background: #1e2d3a;
+  color: #c8e6f7;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 0.92rem;
+  user-select: all;
 }

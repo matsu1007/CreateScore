@@ -3,6 +3,7 @@ import type { ProjectState } from "./types";
 import {
   canAnalyze,
   canExport,
+  canRedo,
   canUndo,
   initialState,
   projectReducer
@@ -31,7 +32,6 @@ describe("store", () => {
       type: "analyzeSuccess",
       payload: {
         frames: [],
-        notesRaw: [],
         notesQ: [
           {
             id: "n",
@@ -40,7 +40,8 @@ describe("store", () => {
             durationTick: 2,
             velocity: 90
           }
-        ]
+        ],
+        chordRoots: []
       }
     });
     expect(ready.status).toBe("Ready");
@@ -85,6 +86,34 @@ describe("store", () => {
     expect(undone.notesQ[0].startTick).toBe(1);
     expect(undone.notesQ[0].midi).toBe(60);
     expect(canUndo(undone)).toBe(false);
+  });
+
+  it("redo restores undone step and clears on new edit", () => {
+    const state = {
+      ...initialState,
+      status: "Ready" as const,
+      notesQ: [{ id: "a", midi: 60, startTick: 0, durationTick: 2, velocity: 90 }],
+      selection: { noteIds: ["a"] }
+    };
+
+    const started = projectReducer(state, { type: "beginEdit" });
+    const moved = projectReducer(started, { type: "moveSelection", deltaTick: 5, deltaMidi: 0 });
+    expect(moved.notesQ[0].startTick).toBe(5);
+
+    const undone = projectReducer(moved, { type: "undoEdit" });
+    expect(undone.notesQ[0].startTick).toBe(0);
+    expect(canUndo(undone)).toBe(false);
+    expect(canRedo(undone)).toBe(true);
+
+    const redone = projectReducer(undone, { type: "redoEdit" });
+    expect(redone.notesQ[0].startTick).toBe(5);
+    expect(canRedo(redone)).toBe(false);
+    expect(canUndo(redone)).toBe(true);
+
+    // new edit clears redo stack
+    const started2 = projectReducer(undone, { type: "beginEdit" });
+    const moved2 = projectReducer(started2, { type: "moveSelection", deltaTick: 3, deltaMidi: 0 });
+    expect(canRedo(moved2)).toBe(false);
   });
 
   it("keeps up to five undo steps", () => {

@@ -8,19 +8,23 @@ import { encodeSmfType0 } from "../midi/smf";
 import { playNotes } from "../midi/playback";
 import type { PlaybackController } from "../midi/playback";
 import { clamp } from "../utils/math";
+import { checkOllamaHealth } from "../api/ollama";
+import { correctNotesWithLLM } from "../dsp/llmCorrect";
 import { AnalysisPanel } from "../ui/AnalysisPanel";
 import { ExportPanel } from "../ui/ExportPanel";
+import { LlmCorrectionPanel } from "../ui/LlmCorrectionPanel";
 import { PianoRollView } from "../ui/PianoRollView";
 import { PitchCurveView } from "../ui/PitchCurveView";
 import { RecorderPanel } from "../ui/RecorderPanel";
 import {
   canAnalyze,
   canExport,
+  canRedo,
   canUndo,
   initialState,
   projectReducer
 } from "./store";
-import type { AnalyzeMessage, AnalyzeParams, AnalyzeRequest } from "./types";
+import type { AnalyzeMessage, AnalyzeParams, AnalyzeRequest, LlmStatus } from "./types";
 
 const ANALYZE_PARAMS: AnalyzeParams = {
   frameLenMs: 30,
@@ -29,7 +33,7 @@ const ANALYZE_PARAMS: AnalyzeParams = {
   fmin: 80,
   fmax: 1000,
   deadbandCent: 35,
-  pitchBackend: "yin",
+  pitchBackend: "crepe-webgpu",
   modelVariant: "tiny",
   normalizeMode: "per_frame",
   outputKind: "prob",
@@ -48,6 +52,7 @@ export const App = (): JSX.Element => {
   const [isPlaybackActive, setIsPlaybackActive] = useState(false);
   const [isPlaybackPaused, setIsPlaybackPaused] = useState(false);
   const [recordMetronomeEnabled, setRecordMetronomeEnabled] = useState(true);
+  const [isPreviewMetronomeActive, setIsPreviewMetronomeActive] = useState(false);
   const [deadbandCent, setDeadbandCent] = useState<number>(ANALYZE_PARAMS.deadbandCent);
   const [pitchBackend, setPitchBackend] = useState<AnalyzeParams["pitchBackend"]>(
     ANALYZE_PARAMS.pitchBackend
@@ -60,6 +65,14 @@ export const App = (): JSX.Element => {
   const [effectivePitchBackend, setEffectivePitchBackend] = useState<AnalyzeParams["pitchBackend"] | null>(
     null
   );
+  const [llmModel, setLlmModel] = useState("qwen2.5:7b");
+  const [llmStatus, setLlmStatus] = useState<LlmStatus>("idle");
+  const [llmElapsed, setLlmElapsed] = useState(0);
+  const [llmTokens, setLlmTokens] = useState(0);
+  const [llmResultMsg, setLlmResultMsg] = useState<string | undefined>();
+  const [llmErrorMsg, setLlmErrorMsg] = useState<string | undefined>();
+  const [llmHelpCmd, setLlmHelpCmd] = useState<string | undefined>();
+  const [correctedNoteIds, setCorrectedNoteIds] = useState<string[]>([]);
 
   const recorderRef = useRef<RecorderController | null>(null);
   const playbackRef = useRef<PlaybackController | null>(null);
@@ -70,7 +83,7 @@ export const App = (): JSX.Element => {
     bpm: number;
   } | null>(null);
   const previewMetronomeCtxRef = useRef<AudioContext | null>(null);
-  const previewMetronomeTimersRef = useRef<number[]>([]);
+  const previewMetronomeIntervalRef = useRef<number | null>(null);
 
   if (!recorderRef.current) {
     recorderRef.current = new RecorderController();
@@ -100,21 +113,17 @@ export const App = (): JSX.Element => {
     recordMetronomeRef.current = null;
   };
 
-  const clearPreviewMetronomeTimers = (): void => {
-    for (const timerId of previewMetronomeTimersRef.current) {
-      window.clearTimeout(timerId);
-    }
-    previewMetronomeTimersRef.current = [];
-  };
-
   const stopPreviewMetronome = (): void => {
-    clearPreviewMetronomeTimers();
-    const ctx = previewMetronomeCtxRef.current;
-    if (!ctx) {
-      return;
+    if (previewMetronomeIntervalRef.current !== null) {
+      window.clearInterval(previewMetronomeIntervalRef.current);
+      previewMetronomeIntervalRef.current = null;
     }
-    void ctx.close();
-    previewMetronomeCtxRef.current = null;
+    const ctx = previewMetronomeCtxRef.current;
+    if (ctx) {
+      void ctx.close();
+      previewMetronomeCtxRef.current = null;
+    }
+    setIsPreviewMetronomeActive(false);
   };
 
   const startRecordMetronome = (bpm: number): void => {
@@ -247,38 +256,39 @@ export const App = (): JSX.Element => {
     setTapTimes([]);
     setEffectivePitchBackend(null);
     dispatch({ type: "clear" });
+    setCorrectedNoteIds([]);
   };
 
   const handlePreviewMetronome = (): void => {
     if (state.status === "Recording") {
       return;
     }
-    stopRecordMetronome();
-    clearPreviewMetronomeTimers();
-
-    let ctx = previewMetronomeCtxRef.current;
-    if (!ctx || ctx.state === "closed") {
-      ctx = new AudioContext();
-      previewMetronomeCtxRef.current = ctx;
+    if (previewMetronomeIntervalRef.current !== null) {
+      stopPreviewMetronome();
+      return;
     }
+    stopRecordMetronome();
+
+    const ctx = new AudioContext();
+    previewMetronomeCtxRef.current = ctx;
     void ctx.resume();
 
     const bpm = Math.max(40, Math.min(240, state.grid.bpm));
     const intervalMs = 60_000 / bpm;
-    for (let beat = 0; beat < 8; beat += 1) {
-      const timerId = window.setTimeout(() => {
-        triggerMetronomeClick(ctx as AudioContext, beat === 0);
-      }, beat * intervalMs);
-      previewMetronomeTimersRef.current.push(timerId);
-    }
-    const closeTimerId = window.setTimeout(() => {
-      if (previewMetronomeCtxRef.current === ctx) {
-        void ctx?.close();
-        previewMetronomeCtxRef.current = null;
+    let beat = 0;
+    void ctx.resume().then(() => triggerMetronomeClick(ctx, true));
+    previewMetronomeIntervalRef.current = window.setInterval(() => {
+      if (ctx.state === "closed") {
+        stopPreviewMetronome();
+        return;
       }
-      previewMetronomeTimersRef.current = [];
-    }, intervalMs * 8 + 120);
-    previewMetronomeTimersRef.current.push(closeTimerId);
+      if (ctx.state === "suspended") {
+        void ctx.resume();
+      }
+      beat = (beat + 1) % 4;
+      triggerMetronomeClick(ctx, beat === 0);
+    }, intervalMs);
+    setIsPreviewMetronomeActive(true);
   };
 
   const runAnalyze = (): void => {
@@ -300,7 +310,7 @@ export const App = (): JSX.Element => {
       window.setTimeout(() => {
         void (async () => {
           try {
-            const { frames, notesRaw, notesQ, pitchBackendUsed } = await analyzePipeline({
+            const { frames, notesQ, chordRoots, pitchBackendUsed } = await analyzePipeline({
               samples: samplesCopy,
               sampleRate: state.audio?.sampleRate ?? 16000,
               grid: state.grid,
@@ -313,8 +323,8 @@ export const App = (): JSX.Element => {
               type: "analyzeSuccess",
               payload: {
                 frames,
-                notesRaw,
-                notesQ
+                notesQ,
+                chordRoots
               }
             });
             setEffectivePitchBackend(pitchBackendUsed);
@@ -362,8 +372,8 @@ export const App = (): JSX.Element => {
           type: "analyzeSuccess",
           payload: {
             frames: message.frames,
-            notesRaw: message.notesRaw,
-            notesQ: message.notesQ
+            notesQ: message.notesQ,
+            chordRoots: message.chordRoots
           }
         });
         setEffectivePitchBackend(message.pitchBackendUsed);
@@ -489,14 +499,81 @@ export const App = (): JSX.Element => {
     URL.revokeObjectURL(url);
   };
 
+  const llmAbortRef = useRef<AbortController | null>(null);
+
+  const handleLlmCorrect = async (): Promise<void> => {
+    setLlmStatus("checking");
+    setLlmResultMsg(undefined);
+    setLlmErrorMsg(undefined);
+    setLlmHelpCmd(undefined);
+    setLlmElapsed(0);
+    setLlmTokens(0);
+
+    const healthy = await checkOllamaHealth();
+    if (!healthy) {
+      setLlmStatus("error");
+      setLlmErrorMsg("Ollama に接続できません (localhost:11434)。");
+      setLlmHelpCmd("ollama serve");
+      return;
+    }
+
+    const ac = new AbortController();
+    llmAbortRef.current = ac;
+    setLlmStatus("running");
+
+    const startTime = Date.now();
+    const elapsedTimer = window.setInterval(() => {
+      setLlmElapsed(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
+
+    const originalNotes = state.notesQ;
+    try {
+      const { notesQ, chordRoots, changedCount } = await correctNotesWithLLM(
+        originalNotes,
+        state.chordRoots,
+        state.grid,
+        llmModel,
+        ac.signal,
+        setLlmTokens
+      );
+      const changedIds = notesQ.filter((n, i) => n.midi !== originalNotes[i]?.midi).map((n) => n.id);
+      setCorrectedNoteIds(changedIds);
+      dispatch({ type: "beginEdit" });
+      dispatch({ type: "llmCorrect", notesQ, chordRoots });
+      setLlmStatus("done");
+      setLlmResultMsg(`${changedCount} 音符を修正しました`);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setLlmStatus("idle");
+      } else {
+        setLlmStatus("error");
+        setLlmErrorMsg(err instanceof Error ? err.message : "補正中にエラーが発生しました");
+      }
+    } finally {
+      window.clearInterval(elapsedTimer);
+      llmAbortRef.current = null;
+    }
+  };
+
+  const handleLlmCancel = (): void => {
+    llmAbortRef.current?.abort();
+  };
+
   const handleUndoEdit = (): void => {
+    setCorrectedNoteIds([]);
     dispatch({ type: "undoEdit" });
+  };
+
+  const handleRedoEdit = (): void => {
+    setCorrectedNoteIds([]);
+    dispatch({ type: "redoEdit" });
   };
 
   const handleTransposeAllOctave = (direction: "up" | "down"): void => {
     if (state.notesQ.length === 0) {
       return;
     }
+    setCorrectedNoteIds([]);
     dispatch({ type: "beginEdit" });
     dispatch({ type: "transposeAllOctave", direction });
   };
@@ -505,6 +582,7 @@ export const App = (): JSX.Element => {
     if (state.notesQ.length === 0) {
       return;
     }
+    setCorrectedNoteIds([]);
     dispatch({ type: "beginEdit" });
     dispatch({ type: "transposeAllSemitone", direction });
   };
@@ -532,6 +610,7 @@ export const App = (): JSX.Element => {
         onStop={handleStopRecord}
         onPlayOriginal={handlePlayOriginal}
         onClear={handleClear}
+        isPreviewMetronomeActive={isPreviewMetronomeActive}
         onPreviewMetronome={handlePreviewMetronome}
         onToggleMetronome={setRecordMetronomeEnabled}
       />
@@ -574,6 +653,9 @@ export const App = (): JSX.Element => {
           <button onClick={handleUndoEdit} disabled={!canUndo(state)}>
             Undo
           </button>
+          <button onClick={handleRedoEdit} disabled={!canRedo(state)}>
+            Redo
+          </button>
           <button
             onClick={() => handleTransposeAllSemitone("down")}
             disabled={state.notesQ.length === 0}
@@ -600,6 +682,7 @@ export const App = (): JSX.Element => {
           </button>
           <button
             onClick={() => {
+              setCorrectedNoteIds([]);
               dispatch({ type: "beginEdit" });
               dispatch({ type: "splitSelection", splitTick });
             }}
@@ -609,6 +692,7 @@ export const App = (): JSX.Element => {
           </button>
           <button
             onClick={() => {
+              setCorrectedNoteIds([]);
               dispatch({ type: "beginEdit" });
               dispatch({ type: "joinSelection" });
             }}
@@ -618,6 +702,7 @@ export const App = (): JSX.Element => {
           </button>
           <button
             onClick={() => {
+              setCorrectedNoteIds([]);
               dispatch({ type: "beginEdit" });
               dispatch({ type: "deleteSelection" });
             }}
@@ -629,16 +714,33 @@ export const App = (): JSX.Element => {
         <PianoRollView
           notes={state.notesQ}
           selection={state.selection.noteIds}
+          correctedNoteIds={correctedNoteIds}
           playheadTick={playheadTick}
           multiSelectMode={multiSelectMode}
+          grid={state.grid}
+          chordRoots={state.chordRoots}
           onSelect={handleSelect}
           onSetSplitTick={setSplitTick}
-          onEditStart={() => dispatch({ type: "beginEdit" })}
+          onEditStart={() => { setCorrectedNoteIds([]); dispatch({ type: "beginEdit" }); }}
           onMoveSelection={(deltaTick, deltaMidi) =>
             dispatch({ type: "moveSelection", deltaTick, deltaMidi })
           }
         />
       </section>
+
+      <LlmCorrectionPanel
+        canCorrect={state.status === "Ready" && state.notesQ.length > 0}
+        model={llmModel}
+        onModelChange={setLlmModel}
+        status={llmStatus}
+        elapsedSec={llmElapsed}
+        tokenCount={llmTokens}
+        resultMessage={llmResultMsg}
+        errorMessage={llmErrorMsg}
+        helpCommand={llmHelpCmd}
+        onCorrect={() => { void handleLlmCorrect(); }}
+        onCancel={handleLlmCancel}
+      />
 
       <ExportPanel
         canPlay={state.notesQ.length > 0}

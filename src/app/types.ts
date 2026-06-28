@@ -33,7 +33,15 @@ export type NoteQ = {
   velocity: number;
 };
 
+export type ChordRoot = {
+  measure: number;    // 0-indexed from first note-containing measure
+  startTick: number;  // absolute tick of this measure's boundary (for x positioning)
+  rootPc: number;     // pitch class 0-11 (0=C, 1=C#, ...)
+  score: number;      // cosine similarity score [0, 1]
+};
+
 export type PitchBackend = "crepe-webgpu" | "crepe-wasm" | "yin";
+export type LlmStatus = "idle" | "checking" | "running" | "done" | "error";
 export type ModelVariant = "tiny" | "full";
 export type NormalizeMode = "per_frame" | "per_batch";
 export type OutputKind = "prob" | "logit";
@@ -50,11 +58,12 @@ export type ProjectState = {
   status: ProjectStatus;
   audio?: AudioBufferData;
   frames?: PitchFrame[];
-  notesRaw?: NoteRaw[];
   grid: GridSetting;
   notesQ: NoteQ[];
+  chordRoots: ChordRoot[];
   selection: { noteIds: string[] };
   undoStack: Array<{ notesQ: NoteQ[]; selection: { noteIds: string[] } }>;
+  redoStack: Array<{ notesQ: NoteQ[]; selection: { noteIds: string[] } }>;
   error?: { code: string; message: string };
 };
 
@@ -88,9 +97,9 @@ export type AnalyzeProgress = {
 export type AnalyzeResult = {
   type: "result";
   frames: PitchFrame[];
-  notesRaw: NoteRaw[];
   notesQ: NoteQ[];
   pitchBackendUsed: PitchBackend;
+  chordRoots: ChordRoot[];
 };
 
 export type AnalyzeError = {
@@ -100,49 +109,3 @@ export type AnalyzeError = {
 };
 
 export type AnalyzeMessage = AnalyzeProgress | AnalyzeResult | AnalyzeError;
-
-export type PitchWorkerInitRequest = {
-  type: "INIT";
-  modelUrl: string;
-  preferred: "webgpu" | "wasm";
-  normalizeMode: NormalizeMode;
-  outputKind: OutputKind;
-};
-
-export type PitchWorkerAnalyzeRequest = {
-  type: "ANALYZE";
-  audioBuffer: ArrayBuffer;
-  sampleRate: number;
-  batchFrames?: number;
-};
-
-export type PitchWorkerRequest = PitchWorkerInitRequest | PitchWorkerAnalyzeRequest;
-
-export type PitchWorkerReady = {
-  type: "READY";
-  backend: "webgpu" | "wasm";
-  modelInfo?: { inputShape?: number[]; outputShape?: number[] };
-};
-
-export type PitchWorkerProgress = {
-  type: "PROGRESS";
-  doneFrames: number;
-  totalFrames: number;
-};
-
-export type PitchWorkerResult = {
-  type: "RESULT";
-  frames: PitchFrame[];
-};
-
-export type PitchWorkerError = {
-  type: "ERROR";
-  code: string;
-  message: string;
-};
-
-export type PitchWorkerMessage =
-  | PitchWorkerReady
-  | PitchWorkerProgress
-  | PitchWorkerResult
-  | PitchWorkerError;

@@ -1,18 +1,20 @@
-import type { GridSetting, NoteQ, PitchFrame, ProjectState } from "./types";
+import type { ChordRoot, GridSetting, NoteQ, PitchFrame, ProjectState } from "./types";
 import { clamp } from "../utils/math";
 import { createId } from "../utils/id";
 
 export const DEFAULT_GRID: GridSetting = {
   bpm: 120,
   timeSig: { num: 4, den: 4 },
-  division: "1/16"
+  division: "1/32"
 };
 
 export const initialState: ProjectState = {
   status: "Empty",
   grid: DEFAULT_GRID,
   notesQ: [],
+  chordRoots: [],
   undoStack: [],
+  redoStack: [],
   selection: { noteIds: [] }
 };
 
@@ -24,14 +26,15 @@ type Action =
       type: "analyzeSuccess";
       payload: {
         frames: PitchFrame[];
-        notesRaw: ProjectState["notesRaw"];
         notesQ: NoteQ[];
+        chordRoots: ChordRoot[];
       };
     }
   | { type: "analyzeFail"; code: string; message: string }
   | { type: "clear" }
   | { type: "beginEdit" }
   | { type: "undoEdit" }
+  | { type: "redoEdit" }
   | { type: "updateGrid"; grid: Partial<GridSetting> }
   | { type: "setSelection"; ids: string[] }
   | { type: "moveSelection"; deltaTick: number; deltaMidi: number }
@@ -39,7 +42,8 @@ type Action =
   | { type: "transposeAllOctave"; direction: "up" | "down" }
   | { type: "deleteSelection" }
   | { type: "splitSelection"; splitTick: number }
-  | { type: "joinSelection" };
+  | { type: "joinSelection" }
+  | { type: "llmCorrect"; notesQ: NoteQ[]; chordRoots: ChordRoot[] };
 
 const uniq = (ids: string[]): string[] => Array.from(new Set(ids));
 const cloneNotes = (notes: NoteQ[]): NoteQ[] => notes.map((note) => ({ ...note }));
@@ -84,6 +88,9 @@ export const canExport = (state: ProjectState): boolean =>
 export const canUndo = (state: ProjectState): boolean =>
   state.status === "Ready" && state.undoStack.length > 0;
 
+export const canRedo = (state: ProjectState): boolean =>
+  state.status === "Ready" && state.redoStack.length > 0;
+
 export const projectReducer = (state: ProjectState, action: Action): ProjectState => {
   switch (action.type) {
     case "recordStart":
@@ -101,10 +108,11 @@ export const projectReducer = (state: ProjectState, action: Action): ProjectStat
         status: "Recorded",
         audio: action.audio,
         frames: undefined,
-        notesRaw: undefined,
         notesQ: [],
+        chordRoots: [],
         selection: { noteIds: [] },
         undoStack: [],
+        redoStack: [],
         error: undefined
       };
     case "analyzeStart":
@@ -121,10 +129,11 @@ export const projectReducer = (state: ProjectState, action: Action): ProjectStat
         ...state,
         status: "Ready",
         frames: action.payload.frames,
-        notesRaw: action.payload.notesRaw,
         notesQ: action.payload.notesQ,
+        chordRoots: action.payload.chordRoots,
         selection: { noteIds: [] },
         undoStack: [],
+        redoStack: [],
         error: undefined
       };
     case "analyzeFail":
@@ -132,6 +141,7 @@ export const projectReducer = (state: ProjectState, action: Action): ProjectStat
         ...state,
         status: "Error",
         undoStack: [],
+        redoStack: [],
         error: { code: action.code, message: action.message }
       };
     case "clear":
@@ -157,18 +167,40 @@ export const projectReducer = (state: ProjectState, action: Action): ProjectStat
       }
       return {
         ...state,
-        undoStack: [...state.undoStack, snapshot].slice(-MAX_UNDO_STEPS)
+        undoStack: [...state.undoStack, snapshot].slice(-MAX_UNDO_STEPS),
+        redoStack: []
       };
     case "undoEdit":
       if (state.undoStack.length === 0) {
         return state;
       }
       const prev = state.undoStack[state.undoStack.length - 1];
+      const currentSnapshot = {
+        notesQ: cloneNotes(state.notesQ),
+        selection: { noteIds: [...state.selection.noteIds] }
+      };
       return {
         ...state,
         notesQ: cloneNotes(prev.notesQ),
         selection: { noteIds: [...prev.selection.noteIds] },
-        undoStack: state.undoStack.slice(0, -1)
+        undoStack: state.undoStack.slice(0, -1),
+        redoStack: [...state.redoStack, currentSnapshot].slice(-MAX_UNDO_STEPS)
+      };
+    case "redoEdit":
+      if (state.redoStack.length === 0) {
+        return state;
+      }
+      const next = state.redoStack[state.redoStack.length - 1];
+      const undoSnapshot = {
+        notesQ: cloneNotes(state.notesQ),
+        selection: { noteIds: [...state.selection.noteIds] }
+      };
+      return {
+        ...state,
+        notesQ: cloneNotes(next.notesQ),
+        selection: { noteIds: [...next.selection.noteIds] },
+        undoStack: [...state.undoStack, undoSnapshot].slice(-MAX_UNDO_STEPS),
+        redoStack: state.redoStack.slice(0, -1)
       };
     case "updateGrid": {
       const nextBpm = action.grid.bpm ? clamp(action.grid.bpm, 40, 240) : state.grid.bpm;
@@ -222,6 +254,13 @@ export const projectReducer = (state: ProjectState, action: Action): ProjectStat
         selection: { noteIds: [] }
       };
     }
+    case "llmCorrect":
+      return {
+        ...state,
+        notesQ: action.notesQ,
+        chordRoots: action.chordRoots,
+        selection: { noteIds: [] }
+      };
     default:
       return state;
   }

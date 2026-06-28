@@ -14,3 +14,6 @@ public/ort/
 public/model/
 *.onnx
 *.onnx.data
+
+# Claude Code local settings
+.claude/
